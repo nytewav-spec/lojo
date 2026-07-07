@@ -143,7 +143,6 @@ function escapeHtml(text) {
 // SOCIAL MEDIA BOT DETECTION
 // =====================================
 
-
 const bots = {
 
     Facebook:[
@@ -184,19 +183,6 @@ const bots = {
 
     Pinterest:[
         "pinterest"
-    ],
-
-    // Additional crawlers for better detection
-    Generic:[
-        "bot",
-        "crawler",
-        "spider",
-        "scraper",
-        "facebook",
-        "whatsapp",
-        "twitter",
-        "instagram",
-        "tiktok"
     ]
 
 };
@@ -321,8 +307,8 @@ app.get("/video/:id",(req,res)=>{
 
     // Set cache headers for social platforms
     res.set({
-        "Cache-Control": "public, max-age=300",
-        "X-Robots-Tag": "noindex"
+        "Cache-Control": "public, max-age=86400",
+        "X-Robots-Tag": "all"
     });
 
 
