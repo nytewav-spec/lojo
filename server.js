@@ -11,7 +11,11 @@ const app = express();
 
 const PORT = process.env.PORT || 3000;
 const SITE_NAME = "Lojo";
-const SITE_URL = process.env.SITE_URL || "https://lojo-production.up.railway.app";
+const SITE_URL =
+    process.env.SITE_URL ||
+    (process.env.RAILWAY_PUBLIC_DOMAIN
+        ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
+        : "http://localhost:3000");
 
 const VIDEO_FILE = path.join(__dirname, "videos.json");
 
@@ -255,6 +259,20 @@ app.get("/",(req,res)=>{
         )
     );
 
+});
+
+
+
+// =====================================
+// HEALTH CHECK
+// =====================================
+
+app.get("/health", (req, res) => {
+    res.status(200).json({
+        status: "ok",
+        service: "Lojo",
+        timestamp: new Date().toISOString()
+    });
 });
 
 
@@ -611,7 +629,7 @@ app.use((req,res)=>{
 // =====================================
 
 
-app.listen(PORT,()=>{
+app.listen(PORT, "0.0.0.0", () => {
 
     console.log("==============================");
     console.log(`🚀 ${SITE_NAME} running`);
@@ -622,10 +640,3 @@ app.listen(PORT,()=>{
     console.log("==============================");
 
 });
-
-
-// =====================================
-// EXPORT FOR RAILWAY
-// =====================================
-
-module.exports = app;
