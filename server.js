@@ -9,9 +9,12 @@ const app = express();
 // CONFIG
 // =====================================
 
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 const SITE_NAME = "Lojo";
-const SITE_URL = `http://localhost:${PORT}`;
+const SITE_URL =
+    process.env.SITE_URL ||
+    `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` ||
+    "http://localhost:3000";
 
 const VIDEO_FILE = path.join(__dirname, "videos.json");
 
@@ -39,19 +42,19 @@ const defaultVideos = [
         id: 1,
         title: "Welcome to Lojo",
         description: "Watch this amazing video now! 🎬",
-        thumbnail: "https://picsum.photos/1200/630"
+        thumbnail: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1200&h=630&fit=crop"
     },
     {
         id: 2,
         title: "Amazing Nature Video",
         description: "Beautiful scenery 🌄",
-        thumbnail: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1200"
+        thumbnail: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1200&h=630&fit=crop"
     },
     {
         id: 3,
         title: "Funny Cat Compilation",
         description: "Funny moments 😂",
-        thumbnail: "https://images.unsplash.com/photo-1574158622682-e40e69881006?w=1200"
+        thumbnail: "https://images.unsplash.com/photo-1574158622682-e40e69881006?w=1200&h=630&fit=crop"
     }
 ];
 
@@ -120,6 +123,20 @@ function newId(){
 }
 
 
+// =====================================
+// HTML ESCAPE (Prevents XSS)
+// =====================================
+
+function escapeHtml(text) {
+    if (!text) return "";
+    return text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
 
 // =====================================
 // SOCIAL MEDIA BOT DETECTION
@@ -148,7 +165,8 @@ const bots = {
     ],
 
     Twitter:[
-        "twitterbot"
+        "twitterbot",
+        "xbot"
     ],
 
     LinkedIn:[
@@ -165,37 +183,43 @@ const bots = {
 
     Pinterest:[
         "pinterest"
+    ],
+
+    // Additional crawlers for better detection
+    Generic:[
+        "bot",
+        "crawler",
+        "spider",
+        "scraper",
+        "facebook",
+        "whatsapp",
+        "twitter",
+        "instagram",
+        "tiktok"
     ]
 
 };
 
 
-
-function detectBot(agent){
+function detectBot(agent = "") {
 
     agent = agent.toLowerCase();
 
+    for (const [platform, signatures] of Object.entries(bots)) {
 
-    for(const platform in bots){
-
-        if(
-            bots[platform]
-            .some(name => agent.includes(name))
-        ){
+        if (signatures.some(sig => agent.includes(sig))) {
 
             return {
-                detected:true,
+                detected: true,
                 platform
             };
 
         }
-
     }
 
-
     return {
-        detected:false,
-        platform:null
+        detected: false,
+        platform: null
     };
 
 }
@@ -219,6 +243,7 @@ app.get("/",(req,res)=>{
     if(req.query.video){
 
         return res.redirect(
+            302,
             `/video/${req.query.video}`
         );
 
@@ -268,17 +293,32 @@ app.get("/video/:id",(req,res)=>{
 
 
 
-    // Humans go to login
-
+    // Humans go to login page (302 redirect)
     if(!visitor.detected){
 
-        return res.redirect("/");
+        return res.redirect(
+            302,
+            "/"
+        );
 
     }
 
 
+    // Set cache headers for social platforms
+    res.set({
+        "Cache-Control": "public, max-age=300",
+        "X-Robots-Tag": "noindex"
+    });
 
-    // Social platforms preview
+
+    // Escape HTML values to prevent XSS
+    const safeTitle = escapeHtml(video.title);
+    const safeDescription = escapeHtml(video.description);
+    const safeThumbnail = escapeHtml(video.thumbnail);
+    const safeId = escapeHtml(String(video.id));
+
+
+    // Social platforms preview (Bots get this)
 
 
     res.send(`
@@ -289,19 +329,33 @@ app.get("/video/:id",(req,res)=>{
 
 <head>
 
-<title>${video.title}</title>
+<title>${safeTitle}</title>
+
+<link rel="canonical" href="${SITE_URL}/video/${safeId}">
 
 
 <meta property="og:title"
-content="${video.title}">
+content="${safeTitle}">
 
 
 <meta property="og:description"
-content="${video.description}">
+content="${safeDescription}">
 
 
 <meta property="og:image"
-content="${video.thumbnail}">
+content="${safeThumbnail}">
+
+<meta property="og:image:width"
+content="1200">
+
+<meta property="og:image:height"
+content="630">
+
+<meta property="og:image:alt"
+content="${safeTitle}">
+
+<meta property="og:locale"
+content="en_US">
 
 
 <meta property="og:type"
@@ -309,7 +363,7 @@ content="video.other">
 
 
 <meta property="og:url"
-content="${SITE_URL}/video/${video.id}">
+content="${SITE_URL}/video/${safeId}">
 
 
 <meta property="og:site_name"
@@ -319,17 +373,26 @@ content="${SITE_NAME}">
 <meta name="twitter:card"
 content="summary_large_image">
 
+<meta name="twitter:title"
+content="${safeTitle}">
+
+<meta name="twitter:description"
+content="${safeDescription}">
+
+<meta name="twitter:image"
+content="${safeThumbnail}">
+
 
 </head>
 
 
 <body>
 
-<h1>${video.title}</h1>
+<h1>${safeTitle}</h1>
 
-<p>${video.description}</p>
+<p>${safeDescription}</p>
 
-<img src="${video.thumbnail}"
+<img src="${safeThumbnail}"
 style="width:100%;max-width:600px">
 
 
@@ -387,24 +450,34 @@ app.get("/api/videos/:id",(req,res)=>{
 
 app.post("/api/videos",(req,res)=>{
 
-
-    const {
+    let {
         title,
         description,
         thumbnail
     } = req.body;
 
 
-
-    if(!title || !description || !thumbnail){
-
+    // Validate input
+    if (!title || !description || !thumbnail) {
         return res.status(400)
         .json({
-            error:"Missing fields"
+            error:"Missing fields: title, description, and thumbnail are required"
         });
-
     }
 
+
+    // Sanitize and validate strings
+    title = typeof title === "string" ? title.trim() : "";
+    description = typeof description === "string" ? description.trim() : "";
+    thumbnail = typeof thumbnail === "string" ? thumbnail.trim() : "";
+
+
+    if (!title || !description || !thumbnail) {
+        return res.status(400)
+        .json({
+            error:"Fields cannot be empty or contain only whitespace"
+        });
+    }
 
 
     const video = {
@@ -449,10 +522,28 @@ app.put("/api/videos/:id",(req,res)=>{
     }
 
 
+    // Sanitize updated fields
+    const updatedFields = {};
+    
+    if (req.body.title !== undefined) {
+        const title = typeof req.body.title === "string" ? req.body.title.trim() : "";
+        if (title) updatedFields.title = title;
+    }
+    
+    if (req.body.description !== undefined) {
+        const description = typeof req.body.description === "string" ? req.body.description.trim() : "";
+        if (description) updatedFields.description = description;
+    }
+    
+    if (req.body.thumbnail !== undefined) {
+        const thumbnail = typeof req.body.thumbnail === "string" ? req.body.thumbnail.trim() : "";
+        if (thumbnail) updatedFields.thumbnail = thumbnail;
+    }
+
 
     Object.assign(
         video,
-        req.body
+        updatedFields
     );
 
 
@@ -534,3 +625,10 @@ app.listen(PORT,()=>{
     console.log("==============================");
 
 });
+
+
+// =====================================
+// EXPORT FOR RAILWAY
+// =====================================
+
+module.exports = app;
