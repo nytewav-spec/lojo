@@ -2,6 +2,8 @@ const express = require("express");
 const path = require("path");
 const fs = require("fs");
 const multer = require("multer");
+const cloudinary = require("cloudinary").v2;
+const { CloudinaryStorage } = require("multer-storage-cloudinary");
 
 const app = express();
 
@@ -20,41 +22,27 @@ const SITE_URL =
 
 const VIDEO_FILE = path.join(__dirname, "videos.json");
 
-// Create uploads folder
-const UPLOAD_DIR = path.join(__dirname, "public", "uploads");
-if (!fs.existsSync(UPLOAD_DIR)) {
-    fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-}
-
 
 // =====================================
-// MULTER SETUP
+// CLOUDINARY SETUP
 // =====================================
 
-const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        cb(null, UPLOAD_DIR);
-    },
-    filename: function (req, file, cb) {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        const ext = path.extname(file.originalname);
-        cb(null, 'video-' + uniqueSuffix + ext);
+cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME || "rtlbhsis",
+    api_key: process.env.CLOUDINARY_API_KEY || "785564953654681",
+    api_secret: process.env.CLOUDINARY_API_SECRET || "62626262662626"
+});
+
+const storage = new CloudinaryStorage({
+    cloudinary: cloudinary,
+    params: {
+        folder: 'lojo-videos',
+        allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
+        transformation: [{ width: 1200, height: 630, crop: 'limit' }]
     }
 });
 
-const upload = multer({
-    storage: storage,
-    limits: { fileSize: 5 * 1024 * 1024 },
-    fileFilter: function (req, file, cb) {
-        const filetypes = /jpeg|jpg|png|gif|webp/;
-        const mimetype = filetypes.test(file.mimetype);
-        const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
-        if (mimetype && extname) {
-            return cb(null, true);
-        }
-        cb(new Error('Only image files are allowed!'));
-    }
-});
+const upload = multer({ storage: storage });
 
 
 // =====================================
@@ -63,10 +51,6 @@ const upload = multer({
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use('/uploads', express.static(path.join(__dirname, 'public', 'uploads'), {
-    maxAge: '1y',
-    immutable: true
-}));
 
 
 // =====================================
@@ -96,7 +80,6 @@ const defaultVideos = [
         siteName: "Funny Moments"
     }
 ];
-
 
 function loadVideos() {
     if (!fs.existsSync(VIDEO_FILE)) {
@@ -181,28 +164,17 @@ function detectBot(agent = "") {
 
 
 // =====================================
-// UPLOAD ROUTE
+// UPLOAD ROUTE (Cloudinary)
 // =====================================
 
-app.post("/api/upload", (req, res, next) => {
-    upload.single("image")(req, res, function (err) {
-        if (err instanceof multer.MulterError) {
-            if (err.code === 'LIMIT_FILE_SIZE') {
-                return res.status(413).json({ error: "File too large. Maximum size is 5MB." });
-            }
-            return res.status(400).json({ error: err.message });
-        }
-        if (err) {
-            return res.status(400).json({ error: err.message });
-        }
-        if (!req.file) {
-            return res.status(400).json({ error: "No image file uploaded" });
-        }
-        res.json({
-            imageUrl: `${SITE_URL}/uploads/${req.file.filename}`,
-            filename: req.file.filename,
-            message: "Image uploaded successfully"
-        });
+app.post("/api/upload", upload.single("image"), (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ error: "No image file uploaded" });
+    }
+    res.json({
+        imageUrl: req.file.path,
+        filename: req.file.filename,
+        message: "Image uploaded successfully to Cloudinary"
     });
 });
 
@@ -387,7 +359,7 @@ app.listen(PORT, "0.0.0.0", () => {
     console.log(`📹 Videos: ${videos.length}`);
     console.log("🤖 Social preview enabled");
     console.log("💾 Storage: videos.json");
-    console.log("📁 Uploads: " + UPLOAD_DIR);
+    console.log("☁️ Cloudinary: Enabled");
     console.log("==============================");
 });
 
