@@ -7,7 +7,6 @@ const { CloudinaryStorage } = require("multer-storage-cloudinary");
 
 const app = express();
 
-
 // =====================================
 // CONFIG
 // =====================================
@@ -22,6 +21,11 @@ const SITE_URL =
 
 const VIDEO_FILE = path.join(__dirname, "videos.json");
 
+// Create uploads folder (fallback if Cloudinary fails)
+const UPLOAD_DIR = path.join(__dirname, "public", "uploads");
+if (!fs.existsSync(UPLOAD_DIR)) {
+    fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+}
 
 // =====================================
 // CLOUDINARY SETUP
@@ -30,7 +34,8 @@ const VIDEO_FILE = path.join(__dirname, "videos.json");
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME || "rtlbhsis",
     api_key: process.env.CLOUDINARY_API_KEY || "785564953654681",
-    api_secret: process.env.CLOUDINARY_API_SECRET || "62626262662626"
+    api_secret: process.env.CLOUDINARY_API_SECRET || "62626262662626",
+    secure: true   // ← IMPORTANT: ensures image URLs use HTTPS
 });
 
 const storage = new CloudinaryStorage({
@@ -44,14 +49,13 @@ const storage = new CloudinaryStorage({
 
 const upload = multer({ storage: storage });
 
-
 // =====================================
 // MIDDLEWARE
 // =====================================
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
+app.use('/uploads', express.static(path.join(__dirname, 'public', 'uploads')));
 
 // =====================================
 // VIDEO DATABASE
@@ -107,7 +111,6 @@ function newId() {
     return videos.length ? Math.max(...videos.map(v => v.id)) + 1 : 1;
 }
 
-
 // =====================================
 // HTML ESCAPE
 // =====================================
@@ -121,7 +124,6 @@ function escapeHtml(text) {
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#039;");
 }
-
 
 // =====================================
 // BOT DETECTION
@@ -162,7 +164,6 @@ function detectBot(agent = "") {
     return { detected: false, platform: null };
 }
 
-
 // =====================================
 // UPLOAD ROUTE (Cloudinary)
 // =====================================
@@ -178,7 +179,6 @@ app.post("/api/upload", upload.single("image"), (req, res) => {
     });
 });
 
-
 // =====================================
 // HOMEPAGE
 // =====================================
@@ -192,7 +192,6 @@ app.get("/", (req, res) => {
     res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-
 // =====================================
 // HEALTH CHECK
 // =====================================
@@ -204,7 +203,6 @@ app.get("/health", (req, res) => {
         timestamp: new Date().toISOString()
     });
 });
-
 
 // =====================================
 // VIDEO SOCIAL PREVIEW
@@ -235,6 +233,10 @@ app.get("/video/:id", (req, res) => {
     const safeId = escapeHtml(String(video.id));
     const safeSiteName = escapeHtml(video.siteName || SITE_NAME);
 
+    console.log("📤 Serving OG tags for video:", video.id);
+    console.log("   Title:", safeTitle);
+    console.log("   Thumbnail:", safeThumbnail);
+
     res.send(`
 
 <!DOCTYPE html>
@@ -262,7 +264,6 @@ app.get("/video/:id", (req, res) => {
 
 `);
 });
-
 
 // =====================================
 // VIDEO API
@@ -331,13 +332,11 @@ app.delete("/api/videos/:id", (req, res) => {
     res.json({ message: "Video deleted" });
 });
 
-
 // =====================================
 // STATIC FILES
 // =====================================
 
 app.use(express.static(path.join(__dirname, "public")));
-
 
 // =====================================
 // 404
@@ -346,7 +345,6 @@ app.use(express.static(path.join(__dirname, "public")));
 app.use((req, res) => {
     res.status(404).send("<h1>404 Page Not Found</h1>");
 });
-
 
 // =====================================
 // START SERVER
