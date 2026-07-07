@@ -35,7 +35,7 @@ cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME || "rtlbhsis",
     api_key: process.env.CLOUDINARY_API_KEY || "785564953654681",
     api_secret: process.env.CLOUDINARY_API_SECRET || "62626262662626",
-    secure: true   // ← IMPORTANT: ensures image URLs use HTTPS
+    secure: true
 });
 
 const storage = new CloudinaryStorage({
