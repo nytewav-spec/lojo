@@ -11,10 +11,7 @@ const app = express();
 
 const PORT = process.env.PORT || 3000;
 const SITE_NAME = "Lojo";
-const SITE_URL =
-    process.env.SITE_URL ||
-    `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` ||
-    "http://localhost:3000";
+const SITE_URL = process.env.SITE_URL || "https://lojo-production.up.railway.app";
 
 const VIDEO_FILE = path.join(__dirname, "videos.json");
 
